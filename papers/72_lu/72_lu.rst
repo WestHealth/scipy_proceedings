@@ -6,12 +6,142 @@
 :email: akwong@westhealth.org
 :institution: Gary and Mary West Health Institute
 
-======================================================================================================
+------------------------------------------------------------------------------------------------------
 Securing Your Collaborative Jupyter Notebooks in the Cloud using Container and Load Balancing Services
-======================================================================================================
+------------------------------------------------------------------------------------------------------
 
 .. class:: abstract
 
 Jupyter has become the go-to platform for developing data applications but data and security concerns, especially when dealing with healthcare, have become paramount for many institutions and applications dealing with sensitive information. How then can we continue to enjoy the data analysis and machine learning opportunities provided by Jupyter and the Python ecosystem while guaranteeing auditable compliance with security and privacy concerns?
-
 We will describe the architecture and implementation of a cloud based platform based on Jupyter that integrates with Amazon Web Services (AWS) and uses containerized services without exposing the platform to the vulnerabilities present in Kubernetes and JupyterHub. This architecture addresses the HIPAA requirements to ensure both security and privacy of data. The architecture uses an AWS service to provide JSON Web Tokens (JWT) for authentication as well as network control. Furthermore, our architecture enables secure collaboration and sharing of Jupyter notebooks. Even though our platform is focused on Jupyter notebooks and JupyterLabs, it also supports R-Studio and bespoke applications that share the same authentication mechanisms. Further, the platform can be extended to other cloud services other than AWS.
+
+Introduction
+------------
+
+This paper focuses on secure implementation of Jupyter Notebooks and Jupyter Labs in a cloud based platform and more specifically on Amazon Web Services (AWS) though many architectures and methods described here are applicable to other cloud platforms. 
+
+Project Jupyter includes Jupyter Hub which provides a proxy and container management. In particular the Zero to Jupyter Hub with Kubernetes, :cite `z2k8s` provides a framework to implement Jupyter Hub on a Kuberetes platform.  The drawback is that Jupyter Hub is not equipped to easily secure. In addition, Kubernetes is notoriously difficult to secure and has many vulnerabilities that are not addressed by default.
+
+The system described uses AWS's Elastic Container Service (ECS) for container management and AWS's application load balancer for authentication.
+
+Described in this paper is an implementation which satisfies privacy and security concerns. However, the reader is advised to tailor the system to suit one's own needs.
+
+Architecture
+------------
+
+There are two distinct levels of architecture described. The cloud architecture comprises the various cloud services which is the lower layer of virtualizaiton. The container archtiecture is the top layer virtualization built on top of the cloud architecture.
+
+Cloud Architecture
+++++++++++++++++++
+
+The basic architecture comprises an identity provider (IDP) used to authenticate a user, an application load balancer (ALB) which on AWS can be configured to allow only authenticated users access, a collection of elastic cloud computer compute (EC2) instances that are used to instantiate the containers. Finally, ECS manages the containers on the EC2 cluster.
+
+**Elastic Container Service**
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+ECS is a container orchestration service. A container is instantiated as an ECS *task*. ECS provides a resource called a *task definition* that allow for the configuration of the container image, the environment variables, command override and container port. 
+
+Taking the most naive approach, ECS can be instructed to start a task based on a task definition. After the task has fully started, the host among the EC2 instances and the mapped port (the port on the EC2 node which is mapped to the container port) is known. At this point, one could write a monitoring function to detect whne a task has started, retrieve the specific host and mapped port and create a listener rule for the application load balancer.
+
+Instead of this cumbersome proceedure, ECS provides another resource called a *service*. A service can manage many aspects of tasks within ECS including the number of instances and a *target group* associated with the service. For our purposes managing the number means selecting a desired count of 1 or 0 depending on whether the container is running or culled due to inactivity. A target group is a collection of ports of hosts, or serverless resources such as AWS lambda to which a listener rule can direct network traffic. In short by specifying a target group to a service, the host and mapped port are automatically assigned to the target group when a task has fully started.
+
+**Application Load Balancer**
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+AWS's ALB can comprise multiple listeners to support multiple protocols. To maintain security, enforcement of HTTPS should be maintained either by not including a listener for HTTP or provide an HTTP listener that redirects all requests to HTTPS.
+
+AWS's ALB is through a listener is able to direct external HTTPS requests to various components. Based on listener rules, a request can be directed on the basis of both the hostname and the path. As an example, we use a path to specify a user and a service such as jupyter (for example, :code:`domain.com/user_id/jupyter` or :code:`domain.com/user_id/rstudio`), this allows us to give each user their own container.
+
+Each listener rule maps a path, hostname or both to a particular target group. Since we uses an ECS service, we can assign a particular service to a target group. The service then manages which ports and EC2 instances are part of the target group. 
+
+While the ALB can enforce encryption from the end user to the ALB, the container application (e.g., jupyter) should also be configured to listen only for HTTPS. In this manner, the communicaitonfrom the end user to the ALB is encrypted as is the communicaiton from the ALB to the container application, ensuring end to end encryption.
+
+Furthermore the application load balancer is also configured to perform authentication from an OpenID Connect (OIDC) compliant IDP. This eliminates the need for multiple messages to be passed when using either SAML or OAuth. Upon authentication, the ALB attaches three fields to the header of the http request :code:`x-amzn-oidc-accesstoken`, :code:`x-amzn-oidc-identity` and :code:`x-amzn-oidc-data` which can be used by the end application to confirm the user's identity and validate the authentication. An example of this process as implemented in a jupyter notebook is described below.
+
+**Shared Storage**
+^^^^^^^^^^^^^^^^^^
+
+In order to facilitate persistence across containers and also collaboration, ECS orchestrates containers on EC2 instances instead of AWS's Fargate product which facilitates containers in a serverless fashion. Persistent storage can be mounted on the underlying EC2 instances. Individual containers can access the persistent storage by bind mounting the persistent storage. To meet security compliance of encryption at rest, the persistent storage should be encrypted. We elected to use the third party ObjectiveFS for cost reasons though native AWS resources can be used provided that both the file system and the network communications to the file system are encrypted.
+
+As a specific example with jupyter notebooks we mount persistent storage as :code:`/media/home/`. For a given user say :code:`user_a` we bind mount :code:`/home/jovyan` to :code:`/media/home/user_a` so that while in the container the user sees :code:`/home/jovyan` the home directory the users files are actually stored in the persistent storage in a :code:`user_a` subdirectory. This configuration has two advantages. Only one persistent volume is needed to support all users' home directories minimizing costs and within the container all users see /home/jovyan thus eliminating the need to build a separate jupyter container image for each user.
+
+With this configuration, multiple services can use the same home directory. For example, in our R Studio deployment :code:`/home/rstudio` is also mapped to :code:`/media/home/user_a`. Furthermore, we also can provide a persistent volume for shared directories. For example, for all users on :code:`project_a` we bind mount :code:`/home/jovyan/projects/project_a` to :code:`/media/projects/project_a` where the persistent volume is mounted to :code:`/media/projects`.
+
+**Resource Summary**
+^^^^^^^^^^^^^^^^^^^^
+
+To securely implement the above cloud architecture, each container instance for each user has a set of resources associated with it. First, a task definition is created for each user, this enables customized bind mounts as described above. Additionally, custom environment variables or task commands can also be supplied through the task definition. The task definition can also direct logging the the appropriate AWS CloudWatch stream.
+
+Each user also has a ECS service, ALB listener rule and target group associated with it. This allows the seamless management of connecting a user to the desired container instance.
+
+Finally each service has an AWS IAM role associated with it, this ensures the user has only the access rights to our AWS cloud that are need by the user. Beyond the rights to operate the container task, additional rights might include access to certain S3 storage or certain AWS Secrets Manager. As an example, we use the AWS Secrets Manager to manage user's credentials to various databases.
+
+To simplify management of the per user resources, an AWS CloudFormation template is used to insure consistency and uniformity among cloud resources whenever a new container instance/user combination is spun up. As an example, our CloudFormation template contains an IAM role, listener rule, target group, task definition, and an ECS service.
+
+Container Architecture
+++++++++++++++++++++++
+
+The architecture in terms of container comprises a persistent hub container, an optional ephemeral provisioner container, and an assortment of semi-persistent application containers such as jupyter notebook. In an alternative deployment, AWS Lambda functions can be functionally substituted for the hub container, but for the sake of simplicity only the container version of the hub is described.
+
+The application containers are described as semi-persistent as they can be started on demand and culled when one or more inactivity criteria has been reached. This can be achieved by updating the associated service to have a desired count of :code:`1` to start or a desired count of :code:`0` to cull.
+
+We adopted a url path routing convention to access each application such as :code;`domain.com/user_id/applicaiton`
+
+**Container Management**
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+The heart of the system is the hub container. To faclilite ALB authentication, two listener rules are provided. One rule allows anyone to connect, so that the hub can present a login page (with single sign on and and IDP this looks like a single login button). The login action redirects the browser to a url which forces authentication via the ALB. Though this step is not necessary, it provides a cue that makes for a smoother user experience. 
+
+Once authenticated, the user can elect to connect to an application container. This can occur under three circumstances: the user's application container is still running, the user's application container has been culled, or the user has never started the application before. If the container is still running, the user is immediately redirected to the container. If the container has been culled, the service is updated to a desired count of :code:`1`. If the appliction has bever been started by the user, resources to spin up the service are created such as by creating a CloudFormation stack.
+
+Additionally, an option to "decommission" an application can be presented where the CloudFormation stack can be deleted.
+
+**Culling**
+^^^^^^^^^^^
+
+The best practice for culling an application is to have the application upon exiting, set the desired count to :code:`0` of its corresponding service.
+
+For the example of jupyter, the start up scripts for both jupyter notebook and jupyter lab contains the following snippet with :code:`main` imported from different places:
+
+.. code:: python
+
+   if __name__ == '__main__':
+      sys.argv[0] = re.sub(r'(-script\.pyw?|\.exe)?$',
+                           '', sys.argv[0])
+      sys.exit(main())
+
+
+
+
+
+Authentication
+--------------
+
+Modifications to Jupyter Notebook
++++++++++++++++++++++++++++++++++
+
+Security
+--------
+
+Encryption at Rest
+++++++++++++++++++
+
+Container Proxy
++++++++++++++++
+
+Antivirus
++++++++++
+
+Auditing
+++++++++
+
+Other Services
+--------------
+
+RStudio
++++++++
+
+VNC Containers
+++++++++++++++
+
+
