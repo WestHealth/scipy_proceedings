@@ -110,21 +110,202 @@ For the example of jupyter, the start up scripts for both jupyter notebook and j
                            '', sys.argv[0])
       sys.exit(main())
 
+Rather than just exiting after :code:`main` completes, a modified start up script updates the desired count of the corresponding service to :code:`0`. Since :code:`boto3` essentially wraps API calls to AWS, a delay before termination is needed to insure the update API call is received before terminating the task. Failure to change the desired count will only result in the service restarting the container upon termination.
 
+.. code:: python
 
+    if __name__ == '__main__':
+        sys.argv[0] = re.sub(r'(-script\.pyw?|\.exe)?$',
+                             '', sys.argv[0])
+        main()
+        session = boto3.Session()
+        ecs = session.client("ecs", region_name)
+        ecs.update_service(cluster=cluster_name,
+                           service=service_name, 
+                           desiredCount=0)
+        # Sleep for 2 minutes give service time to update 
+        time.sleep(120)
 
+Code to retreive the :code:`region_name`, :code:`cluster_name`, and :code:`service_name`, are omitted for clarity, but they can be retrieved from environment variables (set in task definition), passed via :code:`sys.argv` or even by calls to :code:`boto3`. Though the first two options are simpler.
+
+The above modification to the start up scripts ensures that when jupyter exits the task count is zero. However, in order for this to be meaningful culling parameters in the jupyter configuration such as :code:`c.NotebookApp.shutdown_no_activity_timeout` :code:`c.MappingKernelManager.cull_connected`, :code:`c.MappingKernelManager.cull_idle_timeout` and :code:`c.MappingKernelManager.cull_interval`, as well as setting a shell timeout (e.g., :code:`TMOUT` environment variable are set) in the event a terminal is open.
 
 Authentication
 --------------
 
-Modifications to Jupyter Notebook
-+++++++++++++++++++++++++++++++++
+As mentioned above, the bulk of the authentication is performed by the ALB. However, it is important for the individual application to validate a request forwarded by the ALB, for two reasons. Validation prevents potential security vulnerablities due to a misconfiguration in the system or exposes security vulnerabilities during the initial system debugging. Additionally, validation insures that the identity of the user is what is expected. The ALB insures that the user has validly authenticated, but it is up to the application to insure that the correct user has connected. 
+
+Validation is achieved through the JWT token presented in the :code:`x-amzn-oidc-data` header by the ALB. These JWT tokens are signed by a public key retreivable from AWS insuring that only the ALB could have signed them. Within the JWT token, the :code:`kid` field represents the *key ID* for the public key. To validate, the key ID should be extracted and corresponding public key should be retreived from AWS. With the public key, the JWT token can then be validated. We use the :code:`python-jose` module available on PyPi. The :code:`sub` field in the JWT token is the same as the OIDC ID which is also presented in the :code:`x-amzn-oidc-identity` field. The application should then verify this is OIDC ID associated with the expected user. 
+
+Jupyter 
++++++++
+
+Unfortunately, unlike jupyterhub, jupyter notebook/lab do not come with a pluggable authentication module. In order to implement validation, the source file :code:`login.py` must be modified. This file is usually located in the :code:`notebook/auth/` directory in your :code:`site-packages` or `dist-packages` directory. If you build using a standard docker image such as :code:`jupyter/base-notebook` or any of its derivative notebooks, this directory would be :code:`/opt/conda/lib/python3.x/site-packages` directory. Please note that the specific python version may vary dependent on which version of the docker container is used and whether subsequent additonal install modules might force a rollback of python versions.
+
+The specific modification to the :code:`login.py` file involves replacing two methods, the :code:`get` method and the :code:`get_user_token` class method of the :code:`LoginHandler` class.
+
+Unaltered, the method :code:`get` determines whether the :code:`current_user` is set indicating the user has been logged in. If not authenticated, the function presents a login page. Our modificaiton simply adds an additional check that if :code:`current_user` is not set, we validate the JWT token in header to determine additionally whether the user is authenticated. It should also be noted that the function is also decorated as a coroutine to make the function asynchronous as the verification may require network access to retreive a public key.
+
+.. code:: python
+
+    @tornado.gen.coroutine
+    def get(self):
+        authenticated = False
+        if self.current_user:
+            authenticated = True
+        else:
+            if self.verify_jwt():
+                authenticated=True
+        if authenticated:
+            next_url = self.get_argument('next',
+                default=self.base_url)
+            self._redirect_safe(next_url)
+        else:
+            self._render()
+
+The other method to be replaced is the :code:`get_user_token`. Unaltered, the method returns the authorization token used as part of a notebook/lab minimal authentication scheme. This token is normally supplied as a query string in the URL or through the login page. We bypass this mechanism altogether. Instead, we examine the request header for a JWT token supplied by AWS and validate it. If it is successful we provide a token. As far as the rest of the notebook code the value of the token is not used so we supply a random string. Our version of :code:`get_user_token` uses a local cache to store retreived public keys and previously the previously decoded user ID.
+
+.. code:: python
+
+    @classmethod
+    def get_user_token(cls, handler):
+        """Identify the user based on 
+           Authorization header
+        
+        Returns:
+        - uuid if authenticated
+        - None if not
+        """
+
+        authenticated = False
+        if cls.verify_oidc(handler):
+            authenticated = True
+        else:
+            oidc_jwt = handler.request.headers\
+                .get('x-amzn-oidc-data')
+            if oidc_jwt:
+                try:
+                    header = jwt.get_unverified_headers( \
+                        oidc_jwt)
+                except JOSEError:
+                    return None
+                kid = header.get('kid')
+                if kid and kid == user_cache.get('kid') and \
+                    user_cache.get('pk'):
+                    try:
+                        token = jwt.decode(oidc_jwt, user_cache['pk'])
+                    except JOSEError:
+                        return None
+                    oidc_id = handler.request.headers.get('x-amzn-oidc-identity')
+                    if token['sub'] == oidc_id:
+                        authenticated = True
+                        user_cache['jwt'] = oidc_jwt
+                        user_cache['user_id'] = oidc_id
+        if authenticated:
+            return uuid.uuid4().hex
+        else:
+            return None
+
+
+In addition to the two modified methods, we supply two helper methods :code:`verify_jwt` for :code:`get` and :code:`verify_oidc` for :code:`get_user_token`. They perform the token validation and cache management. Additional code which can read identifiers in persistent volumes and verify they match the user who is authenticate can also be added to insure two authenticated users don't have access to the other's containers.
+
+.. code:: python
+
+    def verify_jwt(self):
+        global user_cache
+        oidc_id = self.request.headers.get('x-amzn-oidc-identity')
+        oidc_jwt = self.request.headers.get('x-amzn-oidc-data')
+        
+        if not oidc_jwt:
+            self.log.warning("No JWT Token in Header")
+            return False
+
+        if (user_cache.get('user_id') == oidc_id and user_cache.get('jwt') == oidc_jwt):
+            return True
+
+        try:
+            header = jwt.get_unverified_headers(oidc_jwt)
+        except JOSEError as e:
+            self.log.error("JWT failed to decode: {}".format(e))
+            return False
+
+        kid = header.get('kid')
+        if not kid:
+            self.log.error("No Key ID in JWT token")
+            return False
+
+        if kid != user_cache.get('kid'):
+            if 'pk' in user_cache:
+                del user_cache['pk']
+
+        if not 'pk' in user_cache:
+            try:
+                r = requests.get(PK_SERVER + kid)
+                # TODO treat return code
+                user_cache['pk'] = r.text
+                user_cache['kid'] = kid
+            except requests.RequestException as e:
+                self.log.error("Requests Error: {}".format(e))
+                return False
+
+        try:
+            token = jwt.decode(oidc_jwt, user_cache['pk'])
+        except JOSEError as e:
+            self.log.info("JWT failed to validate: {}".format(e))
+            return False
+
+        if token['sub'] != oidc_id:
+            self.log.error("User ID in token doesn't match user ID in header")
+            return False
+
+        user_cache['user_id'] = oidc_id
+        user_cache['jwt'] = oidc_jwt
+
+    @classmethod
+    def verify_oidc(cls, handler):
+        global user_cache
+        oidc_id = handler.request.headers.get('x-amzn-oidc-identity')
+        oidc_jwt = handler.request.headers.get('x-amzn-oidc-data')
+        oidc_access = handler.request.headers.get('x-amzn-oidc-accesstoken')
+
+        if not oidc_id or not oidc_jwt:
+            return False
+        if oidc_id != user_cache.get('user_id'):
+            return False
+        if oidc_jwt != user_cache.get('jwt'):
+            return False
+        try:
+            header = jwt.get_unverified_headers(oidc_jwt)
+        except JOSEError:
+            return False
+        kid = header.get('kid')
+        if kid != user_cache.get('kid'):
+            return False
+
+        return True
+
+Finally, because we employ path routing the :code:`base_url` configuration needs to be set to insure that the route 
+
+RStudio
++++++++
+
+VNC Containers
+++++++++++++++
+
+Custom Applications
++++++++++++++++++++
 
 Security
 --------
 
 Encryption at Rest
 ++++++++++++++++++
+
+As previoiusly mentioned, persistent storage and associated file system protocol are encrypted give both encryption in transit and encryption at rest for the persistent storage. However, it is also important that the base file system of the EC2 instances are also encrypted to full insure encryption at rest. 
+
+* Mention encrypted file system (EBS?)
+* Mention encrypting the AMI image.
+
 
 Container Proxy
 +++++++++++++++
@@ -135,13 +316,5 @@ Antivirus
 Auditing
 ++++++++
 
-Other Services
---------------
-
-RStudio
-+++++++
-
-VNC Containers
-++++++++++++++
 
 
