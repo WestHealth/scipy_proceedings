@@ -35,7 +35,11 @@ There are two distinct levels of architecture described. The cloud architecture 
 Cloud Architecture
 ++++++++++++++++++
 
-The basic architecture comprises an identity provider (IDP) used to authenticate a user, an application load balancer (ALB) which on AWS can be configured to allow only authenticated users access, a collection of elastic cloud computer compute (EC2) instances that are used to instantiate the containers. Finally, ECS manages the containers on the EC2 cluster.
+.. figure:: cloud.pdf
+
+   Cloud Architecture. :label:`cloudfig`
+
+The basic cloud architecture is shown in Fig. :ref:`cloudfig`. It comprises an identity provider (IDP) used to authenticate a user, an application load balancer (ALB) which on AWS can be configured to allow only authenticated users access, a collection of elastic cloud computer compute (EC2) instances that are used to instantiate the containers. Finally, ECS manages the containers on the EC2 cluster.
 
 **Elastic Container Service**
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -82,6 +86,10 @@ To simplify management of the per user resources, an AWS CloudFormation template
 Container Architecture
 ++++++++++++++++++++++
 
+.. figure:: container.pdf
+
+   Cloud Architecture. :label:`cloudfig`
+
 The architecture in terms of container comprises a persistent hub container, an optional ephemeral provisioner container, and an assortment of semi-persistent application containers such as jupyter notebook. In an alternative deployment, AWS Lambda functions can be functionally substituted for the hub container, but for the sake of simplicity only the container version of the hub is described.
 
 The application containers are described as semi-persistent as they can be started on demand and culled when one or more inactivity criteria has been reached. This can be achieved by updating the associated service to have a desired count of :code:`1` to start or a desired count of :code:`0` to cull.
@@ -92,6 +100,10 @@ We adopted a url path routing convention to access each application such as :cod
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 The heart of the system is the hub container. To faclilite ALB authentication, two listener rules are provided. One rule allows anyone to connect, so that the hub can present a login page (with single sign on and and IDP this looks like a single login button). The login action redirects the browser to a url which forces authentication via the ALB. Though this step is not necessary, it provides a cue that makes for a smoother user experience. 
+
+Since the hub container may be given privileges to set IAM roles for the application services, the role under which the hub service runs can have a boundary policy attached to it :cite:`boundary`. This insures that any role created by the hub service is constrained to include the boundary policy. This prevents the hub from being able to create an arbitrary role should the container become compromised.
+
+The provisioner container is an ephemeral task which is run with the persistent storage mounted. The provisioner can create a home directory for a user the first time the user logs in and provision the directory with any necessary files. While the functionality of the provisioner container could be incorporated in the hub container. Separation allows the provisioner to have no [WHY?]
 
 Once authenticated, the user can elect to connect to an application container. This can occur under three circumstances: the user's application container is still running, the user's application container has been culled, or the user has never started the application before. If the container is still running, the user is immediately redirected to the container. If the container has been culled, the service is updated to a desired count of :code:`1`. If the appliction has bever been started by the user, resources to spin up the service are created such as by creating a CloudFormation stack.
 
