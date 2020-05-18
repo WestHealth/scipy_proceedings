@@ -313,6 +313,11 @@ Finally, because we employ path routing the :code:`base_url` configuration needs
 RStudio
 +++++++
 
+.. figure:: rstudio.pdf
+
+   Inside the RStudio Container :label:`rstudio`
+
+
 Our implementation of RStudio Server on the same cloud platform is non-invasive to the code base, but more complicated architecturally. Since RStudio does not have a way to set the base URL of the application, an :code:`nginx` is necessary to proxy request to RStudio Server using the :code:`proxy_redirect` directive to rewrite the HTTP paths.
 
 For authentication, RStudio Server maintains authentication session information in a cookie. So with :code:`nginx` we capture, the :code:`auth-sign-in` URL and redirect it to an lightweight webapp whose sole function is to authenticate the user, set the cookie and redirect the browser to RStudio Server. Since the app is necessary in this configuration, we also configure the app to respond to a :code:`/ping` request issued by the ALB target group's health check.
@@ -346,6 +351,10 @@ The :code:`days` is the number of days til the cookie expires, and :code:`userna
 
 VNC Containers
 ++++++++++++++
+
+.. figure:: novnc.pdf
+
+   Inside a VNC Container :label:`vnc`
 
 There are many desktop apps for Linux which may also be useful to deploy via a web application on a cloud cluster such as presented here. The following implementation allows the deployment of such applications such as Orange and Falcon through the use of a web VNC client to a VNC server running in a container.
 

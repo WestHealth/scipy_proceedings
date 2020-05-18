@@ -19,35 +19,66 @@ Quasi-orthonormal Encoding for Machine Learning Applications
 Introduction
 ------------
 
-
 While most popular machine learning methods such as deep learning
 require numerical data as input, categorical data is very common
 practice. For example, a person's vitals could be a combination of both,
 they could include height, weight (numerical) and gender, race
 (categorical). The challenge is to convert the categorical data into a
-vector of some sort. There is a good overview of most encoding
-techniques at this blog
-post :cite:`Hale2018`.
-He further categorizes the coding techniques as *classic*, *contrast*,
-and *Bayesian*. Notably, *word embeddings* are not mentioned. Both
+vector of some sort. 
+
+One-hot encoding which is discussed in the next section is very
+commonly used these days in machine learning but has the draw back
+that it can increase the dimensionality of the data by the cardinality
+of the category. For small category, this is not a significant issue
+but when categories with high cardinality are present, many problems
+can arise as described below.
+
+Quasiorthonormal encoding (QOE) is a generalization of the one-hot
+encoding and exploits the fact that in high dimensional vector spaces,
+two random vectors are almost always orthogonal. The concept originated
+with Kůrková and Kainen :cite:`kurkova`. In many ways, QOE functions
+the same as one-hot encoding but does not increase the dimensionality
+of the data to the same degree as one-hot encoding. Historically, QOE
+was considered for a method of encoding words but modern techinques
+such as *word embeddings* are now considered the state of the art
+method of encoding language.
+
+Some advantages to QOE include a reduction of dimensionality over that
+of using one-hot encoding thus limiting effects of the \`\`curse of
+dimensionality'' :cite:`wiki:curse` or the problem of high dimension low sample size
+(HDLSS). The advantage over other encodings such as binary, hash, etc.
+is that it does not induce artificial geometric relationships that can
+cause downstream bias in the results because each label in a category
+remains mathematically near orthogonal to the other labels.
+
+We will briefly survey *classuc* encoding methods, discuss the
+theoretical aspects of QOE, and present a detailed example implementation
+of QOE in tensorflow.
+
+Background
+----------
+
+Coding methods can be categorized as *classic*, *contrast*,
+*Bayesian* and *word embeddings*. Classic, contrast and Bayseian
+encoding are given a good overview treatment by Hale's blog
+:cite:`Hale2018` with examples to be found as part of the :code:``scikit-learn`` category
+encoding package :cite:`scikit`. He further categorizes the coding techniques as  Notably, *word embeddings* are not mentioned. Both
 contrast encoding and Bayesian encoding use the statistics of the data
 to facilitate encoding. These two categories may be of use when more
 statistical analysis is required, however there has not been widespread
 adoption of these emcoding techniques for machine learning. These
-encoding techiques can be found as part of the ``scikit-learn`` category
-`encoding
-package <https://contrib.scikit-learn.org/categorical-encoding/index.html>`__.
+encoding techiques can be found as part of the
 
-Though we will pursue a discussion of classic encodings and modern
-derivatives, word embeddings deserve special mention. Word embeddings
+In a category of its own, word embeddings deserve special mention
+:cite:`wiki:wordembeddings`. Word embeddings 
 are used to represent words, phrases or even entire documents as a
 vector. Their goal is that similar meaning or concepts get mapped to
 vectors that are close in the target vector space. Additionally, it is
 adapted for encoding a large categorical feature (i.e., words) into a
 relatively lower dimensional space.
 
-Categorical Encodings
----------------------
+The remainder of the section will describe some common classic
+categorical encodings
 
 Ordinal Encoding
 ~~~~~~~~~~~~~~~~
@@ -61,7 +92,7 @@ calculation of basic statistics. An associated data dictionary is used
 to convert the values back and forth between a number and a category.
 Take for example the case of gender, male could be encoded as 1 and
 female as 2, with a data dictionary as follows:
-``{'male': 1, 'female': 2}``
+:code:``{'male': 1, 'female': 2}``
 
 Suppose we have three categories of ethnic groups: White, Black, and
 Asian. Under ordinal encoding, suppose What is encoded as 1, Black is
@@ -84,28 +115,32 @@ This is the most common encoding used in machine learning. One hot
 encoding takes a category with cardinality :math:`N` and encodes each
 categorical value with an :math:`N`-dimensional vector with a single '1'
 and the remainder '0's. Take as an example encoding 5 makes of Japanese
-Cars: Toyota, Honda, Subaru, Nissan, Mitsubishi. The following table
-shows a comparison of coding between ordinal and one-hot:
+Cars: Toyota, Honda, Subaru, Nissan, Mitsubishi. Table :ref:`onehot`
+shows a comparison of coding between ordinal and one-hot encodings.
 
-+--------------+-----------+---------------+
-| Make         | Ordinal   | One-Hot       |
-+==============+===========+===============+
-| Toyota       | 1         | (1,0,0,0,0)   |
-+--------------+-----------+---------------+
-| Honda        | 2         | (0,1,0,0,0)   |
-+--------------+-----------+---------------+
-| Subaru       | 3         | (0,0,1,0,0)   |
-+--------------+-----------+---------------+
-| Nissan       | 4         | (0,0,0,1,0)   |
-+--------------+-----------+---------------+
-| Mitsubishi   | 5         | (0,0,0,0,1)   |
-+--------------+-----------+---------------+
+.. raw:: latex
+
+   \begin{table}
+     \begin{longtable*}{lcc}
+     \toprule
+     \textbf{Make} & \textbf{Ordinal} & \textbf{One-Hot} \\
+     \midrule
+     Toyota &  1 &  (1,0,0,0,0) \\
+     Honda &  2 &  (0,1,0,0,0) \\
+     Subaru &  3 &  (0,0,1,0,0) \\
+     Nissan &  4 &  (0,0,0,1,0) \\
+     Mitsubishi &  5 &  (0,0,0,0,1) \\
+     \bottomrule
+     \end{longtable*}
+
+     \caption{Examples of Ordinal and One-Hot Encodings \DUrole{label}{onehot}}
+   \end{table}
+
 
 The advantage is that one hot encoding doesn't induce an implicit
 ordering or between categories. The primary disadvantage is that the
 dimensionality of the problem has increased with corresponding increases
-in complexity and computation (see `curse of
-dimensionality <https://en.wikipedia.org/wiki/Curse_of_dimensionality>`__)
+in complexity, computation and "the curse of high dimensionality".
 This easily leads to the high dimensionality low sample size (HDLSS)
 situation, which is a problem for most machine learning methods.
 
@@ -115,21 +150,27 @@ Binary Encoding, Hash Encoding, BaseN Encoding
 Somewhere in between these two are *binary encoding*, *hash encoding*,
 and *baseN* encoding. Binary encoding simply labels each category with a
 unique binary code and converts the binary code to a vector. Using the
-previous example of the Japanese car makes:
+previous example of the Japanese car makes, table :ref:`binary` shows
+an example of binary encoding.
 
-+--------------+-----------+-------------+---------------+
-| Make         | Ordinal   | as Binary   | Binary Code   |
-+==============+===========+=============+===============+
-| Toyota       | 1         | 001         | (0,0,1)       |
-+--------------+-----------+-------------+---------------+
-| Honda        | 2         | 010         | (0,1,0)       |
-+--------------+-----------+-------------+---------------+
-| Subaru       | 3         | 011         | (0,1,1)       |
-+--------------+-----------+-------------+---------------+
-| Nissan       | 4         | 100         | (1,0,0)       |
-+--------------+-----------+-------------+---------------+
-| Mitsubishi   | 5         | 101         | (1,0,1)       |
-+--------------+-----------+-------------+---------------+
+.. raw:: latex
+
+   \begin{table}
+     \begin{longtable*}{lccc}
+     \toprule
+     \textbf{Make} & \textbf{Ordinal} & \textbf{as Binary} & \textbf{Binary Code} \\
+     \midrule
+     \endfirsthead
+     Toyota &  1 &  001 &  (0,0,1) \\
+     Honda &  2 &  010 &  (0,1,0) \\
+     Subaru &  3 &  011 &  (0,1,1) \\
+     Nissan &  4 &  100 &  (1,0,0) \\
+     Mitsubishi &  5 &  101 &  (1,0,1) \\
+     \bottomrule
+     \end{longtable*}
+     \caption{Example of Binary Codes \DUrole{label}{binary}}
+
+   \end{table}
 
 Hash encoding assigns each category an ordinal value that is then
 converted into a binary hash value that is encoded as an :math:`n`-tuple
@@ -141,139 +182,82 @@ one-hot encoding. The chief disadvantage is that categories can collide
 if two categories accidentally map into the same hash value. This is a
 *hash collision* and must be fixed separately using a resolution
 mechanism. A good treatment of hash coding can be found
-`here <https://booking.ai/dont-be-tricked-by-the-hashing-trick-192a6aae3087>`__
+here :cite:`hash`
 
 Finally, baseN encoding is a generalization of binary encoding that uses
 a number base other than 2 (binary). Below is an example of the Japanese
 car makes using base 3,
 
-+--------------+-----------+--------------+----------------+-------------------------+
-| Make         | Ordinal   | as Ternary   | Ternary Code   | Balanced Ternary Code   |
-+==============+===========+==============+================+=========================+
-| Toyota       | 1         | 01           | (0,1)          | (0,1)                   |
-+--------------+-----------+--------------+----------------+-------------------------+
-| Honda        | 2         | 02           | (0,2)          | (0,-1)                  |
-+--------------+-----------+--------------+----------------+-------------------------+
-| Subaru       | 3         | 10           | (1,0)          | (1,0)                   |
-+--------------+-----------+--------------+----------------+-------------------------+
-| Nissan       | 4         | 11           | (1,1)          | (1,1)                   |
-+--------------+-----------+--------------+----------------+-------------------------+
-| Mitsubishi   | 5         | 12           | (1,2)          | (1,-1)                  |
-+--------------+-----------+--------------+----------------+-------------------------+
+.. raw:: latex
+
+   \begin{table}
+     \begin{longtable*}{lcccc}
+     \toprule
+     & \textbf{as} & \textbf{Ternary} & \textbf{Balanced} \\
+     \textbf{Make} & \textbf{Ordinal} & \textbf{Ternary} & \textbf{Code} & \textbf{Ternary Code} \\
+     \midrule
+     \endfirsthead
+     Toyota & 1 & 01 & (0,1) & (0,1) \\
+     Honda & 2 & 02 & (0,2) & (0,-1) \\
+     Subaru & 3 & 10 & (1,0) & (1,0) \\
+     Nissan & 4 & 11 & (1,1) & (1,1) \\
+     Mitsubishi & 5 & 12 & (1,2) & (1,-1) \\
+     \bottomrule
+     \end{longtable*}
+     \caption{Example of Ternary Codes}
+   \end{table}
 
 A disadvantage of all three of these techniques is that while it does
 reduce the dimension of the encoded feature, artificial geometric
 relationships may creep in between unrelated categories. For example,
-``(0.7,0.7)`` may be confused between Toyota and Honda or a weak Subaru
-result, although this is still better than ordinal encoding.
+:code:``(0.7,0.7)`` may be confused between Toyota and Honda or a weak Subaru
+result, although the effect is not as pronounced as ordinal encoding.
 
-Quasiorthonormal Encoding
-~~~~~~~~~~~~~~~~~~~~~~~~~
+Decoding
+~~~~~~~~
 
-Quasiorthonormal encoding (QOE) is a generalization of the one-hot
-encoding and exploits the fact that in high-dimensional vector spaces,
-two random vectors are generally almost orthogonal. The concept
-originated with `Kůrková and
-Kainen <https://ieeexplore.ieee.org/document/549073>`__ almost 25 years
-ago. The principle is the same as one-hot encoding when you view the
-encoded values as unit vectors as shown:
+Of course, with categorical encoding, the ability to decode an encoded vector back to a category can be very important. If the categorical variable is only an input to a machine learning system, retrieving a category may not be very important. For example, one may have a product rating model which delivers a rating based on a number of variables, some numeric like price, but others might be categorical like color, but since the output does not require category decoding, it is not important.
 
-+--------------+-----------+------------------------+------------------------+
-| Make         | Ordinal   | One-Hot                | QOE                    |
-+==============+===========+========================+========================+
-| Toyota       | 1         | :math:`\mathbf{u}_1`   | :math:`\mathbf{q}_1`   |
-+--------------+-----------+------------------------+------------------------+
-| Honda        | 2         | :math:`\mathbf{u}_2`   | :math:`\mathbf{q}_2`   |
-+--------------+-----------+------------------------+------------------------+
-| Subaru       | 3         | :math:`\mathbf{u}_3`   | :math:`\mathbf{q}_3`   |
-+--------------+-----------+------------------------+------------------------+
-| Nissan       | 4         | :math:`\mathbf{u}_4`   | :math:`\mathbf{q}_4`   |
-+--------------+-----------+------------------------+------------------------+
-| Mitsubishi   | 5         | :math:`\mathbf{u}_5`   | :math:`\mathbf{q}_5`   |
-+--------------+-----------+------------------------+------------------------+
+In an application such as categorization or imputation :cite:`gondara`. Retrieving the category from a vector is crucial. In a training a modern classification model, a categorical output is often subject to an activation function which converts a vector into a probability of each category such as a *softmax* function. Essentially, the softmax is a continuous and differential version of a \`\`hard max'' function which would assign a :code:`1` to the vector representing the most likely category and a :code:`0` to all the other categories. The conversion to a probability distribution allows the use of a negative log likelihood loss function rather than the standard root mean squared error.
 
-where :math:`\mathbf{u}_i` are unit vectors in :math:`\mathbb{R}^5` and
-:math:`{\mathbf{q}_i}` are a set of quasiorthogonal vectors in a
-dimension less than 5. The set :math:`{\mathbf{q}_i}` is
-quasiorthonormal if each :math:`\mathbf{q}_i` is normal
-(:math:`||\mathbf{q}_i||=1`) and
-:math:`|\mathbf{q}_i\cdot \mathbf{q}_j|<\epsilon` for some small
-:math:`\epsilon` value and for :math:`i\ne j`. In otherwords, if
-:math:`i` and :math:`j` are distinct :math:`\mathbf{q}_i` and
-:math:`\mathbf{q}_j` are almost perpendicular.
 
-We will explore more about QOE in the next article.
+Typically, other classic encoding methods use thresholds to determine the approriate representation, which makes them difficult to use as outputs of machine learning systems such as neural networks. The decoding process is difficult to convert to a probability distribution making the more favorable negative log likelihood loss function more difficult to use, furthermore the thresholding operations are generally not differentiable.
 
-Summary
-~~~~~~~
 
-Although most machine learning methods require numerical data,
-categorical data is very common in certain areas, such as medical data
-science or survey analysis. We reviewed the most popular encoding
-methods to make this kind of data tractable for machine learning, but
-each of them has drawbacks in computation or interpretation that can
-lead to confusing downstream results, if not handled correctly at the
-outset.
+Theory
+------
 
-Introduction
-------------
+In this section, we'll briefly define and discuss quasiorthogonality, show how it relats to one-hot encoding and describe how this relationship can be used to develop a categorical encoding with lower cardinality.
 
-Quasiorthonormal encoding (QOE) is a generalization of the one-hot
-encoding and exploits the fact that in high dimensional vector spaces,
-two random vectors are almost always orthogonal. The concept originated
-with `Kůrková and
-Kainen <https://ieeexplore.ieee.org/document/549073>`__ almost 25 years
-ago. The principle is the same as one-hot encoding when you view the
-encoded values as unit vectors as shown:
+Quasiorthogonality
+~~~~~~~~~~~~~~~~~~
 
-+--------------+-----------+------------------------+------------------------+
-| Make         | Ordinal   | One-Hot                | QOE                    |
-+==============+===========+========================+========================+
-| Toyota       | 1         | :math:`\mathbf{u}_1`   | :math:`\mathbf{q}_1`   |
-+--------------+-----------+------------------------+------------------------+
-| Honda        | 2         | :math:`\mathbf{u}_2`   | :math:`\mathbf{q}_2`   |
-+--------------+-----------+------------------------+------------------------+
-| Subaru       | 3         | :math:`\mathbf{u}_3`   | :math:`\mathbf{q}_3`   |
-+--------------+-----------+------------------------+------------------------+
-| Nissan       | 4         | :math:`\mathbf{u}_4`   | :math:`\mathbf{q}_4`   |
-+--------------+-----------+------------------------+------------------------+
-| Mitsubishi   | 5         | :math:`\mathbf{u}_5`   | :math:`\mathbf{q}_5`   |
-+--------------+-----------+------------------------+------------------------+
+In a suitably high dimensional space, two randomly selected vectors are very likely to be nearly orthogonal or quasiorthogonal. In such an :math:`N`-dimensional vector space, there are sets of :math:`K` vectors which are mutually quasiorthogoanl where `K\\gg N.`. A more formal definition can be stated as follows.
+Given an :math:`\epsilon` two vectors :math:`{\bf x}` and
+:math:`{\bf y}` are said to be *quasiorthogonal* if
+:math:`{|{\bf x}\cdot {\bf y}|\over \|{\bf x}\| \|{\bf y}\|}<\epsilon`.
+This extends the orthogonality principle by allowing the inner product
+to not exactly equal zero. As an extension, we can define a
+quasiorthonormal *basis* by a set of normal vectors
+:math:`\{{\bf q}_i\}` for :math:`i=1,\ldots,K` such that
+:math:`|{\bf q}_i\cdot {\bf q}_j< \epsilon |` and
+:math:`||{\bf q}_i||=1`, for all :math:`i,j\in\{1,\ldots,K\}`, where in
+principle for large enough :math:`n`, :math:`K\gg n`.
 
-where :math:`\mathbf{u}_i` are unit vectors in :math:`\mathbb{R}^5` and
-:math:`{\mathbf{q}_i}` are a set of quasiorthogonal vectors in a
-dimension less than 5. The set :math:`{\mathbf{q}_i}` is
-quasiorthonormal if each :math:`\mathbf{q}_i` is normal
-(:math:`||\mathbf{q}_i||=1`) and
-:math:`|\mathbf{q}_i\cdot \mathbf{q}_j|<\epsilon` for some small
-:math:`\epsilon` value and for :math:`i\ne j`. In otherwords, if
-:math:`i` and :math:`j` are distinct :math:`\mathbf{q}_i` and
-:math:`\mathbf{q}_j` are almost perpendicular.
+The question of how large a quasiorthonormal basis can be found for a given :math:`n`-dimensional vector space and :math:`\epsilon` is answered in part by the mathematical literature. :cite:`Kainen2020` derived a lower bound for :math:`K` as a function of :math:`\epsilon`
+and :math:`n`. Namely,
 
-By relaxing the condition that the encoded values be orthogonal many
-more codes can be used in a smaller number of dimensions. A similar
-principle to this is used in areas such as Code Division Multiple Access
-(CDMA) that is used in mobile telephony. In lay terms, if you allow for
-almost orthogonal vectors rather than strictly orthogonal, you can fit
-more vectors into the same vector space.
+.. math:: K \ge e^{n\epsilon^2}.
 
-Some advantages to QOE include a reduction of dimensionality over that
-of using one-hot encoding thus limiting effects of the "curse of
-dimensionality" or the problem of high dimension low sample size
-(HDLSS). The advantage over other encodings such as binary, hash, etc.
-is that it does not induce artificial geometric relationships that can
-cause downlstream bias in the results because each label in a category
-remains mathematically orthogonal to the other labels.
+This means that given an :math:`\epsilon` the size of potential quasiorthonormal basis grows at least exponentially as :math:`n` grows.
 
-While Kůrková and Kainen proposed this type of encoding almost 25 years
-ago, machine learning has advanced since then so we include a short
-recap of the relevant issues next.
+One Hot Encoding Revisited
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-One Hot Encoding Recap
-----------------------
-
-In machine learning, the typical aspects of one hot encoding maps a
-variable with :math:`n` categories into a set of unit vectors in a
+The method to exploit quasiorthogonality in categorical encoding
+parallels the use of orthonormal basis in one-hot encoding. In machine
+learning, the typical aspects of one hot encoding maps a 
+variable with :math:`n` categories into a set of unit vectors in a 
 :math:`n`-dimensional space: :math:`L=\{l_i\}` for :math:`i=1\ldots n`,
 then the one hot encoding :math:`\mathbb{1}_L:L \mapsto \mathbb{R}^n`
 given by :math:`l_i \mapsto \mathbf{u}_i` where :math:`\mathbf{u}_i` is
@@ -291,7 +275,7 @@ is not easily differentiable which problems in ML learning algorithms
 that require derivatives. To fix this, a *softer* version is used called
 the *softargmax* or now as simply *softmax* and is defined as follows:
 
-.. math:: \mathrm{softmax}(\mathbf{z})_i={e^{z_i}\over \sum_{j=1}^n e^{z_j}}
+.. math::  \mathrm{softmax}(\mathbf{z})_i={e^{z_i}\over\sum_{j=1}^n e^{z_j}}
 
 for :math:`i=1,2,\ldots,n` and
 :math:`{\bf z}=(z_1, z_2,\ldots, z_n) \in \mathbb{R}^n` where
@@ -300,42 +284,65 @@ decodes a one-hote encoded vector into a probability density function
 which enables application of negative log likelihood loss functions or
 cross entropy losses.
 
-We can generalize the one-hot encoding formulation to use an arbitrary
-orthonormal basis :math:`{\mathbf{u}_i}`. To decode a one-hot encoded
-value in this framework, we would take
+Though one-hot encoding by the nature of its name uses unit vectors
+with one :code:`1` in the vector hence a *hot* component. The
+formalization of the one hot encoding above allows *any* orthonormal
+basis to be used. So to use a generalized one-hot encoding with
+orthonormal basis :math:`{\mathbf{u}_i}`, one would map the label
+:math:`j` to :math:`{\mathbf{u}_j}` for encoding where the
+:math:`{\mathbf{u}_i}` no longer have to take the standard basis form.
+To decode an encoded value in this framework, we would take
 :math:`i = \mathrm{argmax}(\mathbf{z}\cdot\mathbf{u}_1,\mathbf{z}\cdot\mathbf{u}_2,\ldots,\mathbf{z}\cdot\mathbf{u}_n)`.
 This reduces to :math:`\mathrm{argmax}\mathbf(z)` for the standard
 basis. Thus, the softmax function can be expressed as the following,
 
 .. math:: \mathrm{softmax}({\bf z})_i={e^{{\bf z}\cdot {\bf u}_i}\over \sum_{j=1}^n e^{{\bf z}\cdot {\bf u}_j}}.
 
-Quasiorthogonality
-------------------
+Encoding
+~~~~~~~~
 
-Given an :math:`\epsilon` two vectors :math:`{\bf x}` and
-:math:`{\bf y}` are said to be *quasiorthogonal* if
-:math:`{|{\bf x}\cdot {\bf y}|\over \|{\bf x}\| \|{\bf y}\|}<\epsilon`.
-This extends the orthogonality principle by allowing the inner product
-to not exactly equal zero. As an extension, we can define a
-quasiorthonormal *basis* by a set of normal vectors
-:math:`\{{\bf q}_i\}` for :math:`i=1,\ldots,K` such that
-:math:`|{\bf q}_i\cdot {\bf q}_j< \epsilon |` and
-:math:`||{\bf q}_i||=1`, for all :math:`i,j\in\{1,\ldots,K\}`, where in
-principle for large enough :math:`n`, :math:`K\gg n`. `Kainen and
-Kůrková <https://www.cs.cas.cz/~vera/publications/books/C1.pdf>`__
-derived a lower bound for :math:`K` as a function of :math:`\epsilon`
-and :math:`n`. Namely,
-
-.. math:: K \ge e^{n\epsilon^2}.
-
-Quasiorthonormal Encoding
--------------------------
-
-Briefly, quasiorthonormal encoding simply substitutes a quasiorthonormal
+The principle behind QOE is simple. A quasiorthonormal basis is
+substituted for the orthonormal basis described above. More formally,
+we use the quasiorthonormal
 basis :math:`\{{\bf q}_i\}` for the orthonormal basis
-:math:`\{{\bf u}_i\}` used above. So more formally, given a
+:math:`\{{\bf u}_i\}` used above. Sogiven a
 quasiorthonormal basis, we can define a QOE for a set :math:`L=\{l_i\}`
-by :math:`{\mathbb q}(l_i)= {\bf q}_i`. Decoding under QOE would use the
+by :math:`{\mathbb q}(l_i)= {\bf q}_i`. 
+
+
+
+
+encoded values as unit vectors as shown in Table :ref:`qoe`, where :math:`\mathbf{u}_i` are unit vectors in :math:`\mathbb{R}^5` and
+:math:`{\mathbf{q}_i}` are a set of quasiorthogonal vectors in a
+dimension less than 5. The set :math:`{\mathbf{q}_i}` is
+quasiorthonormal if each :math:`\mathbf{q}_i` is normal
+(:math:`||\mathbf{q}_i||=1`) and
+:math:`|\mathbf{q}_i\cdot \mathbf{q}_j|<\epsilon` for some small
+:math:`\epsilon` value and for :math:`i\ne j`. In otherwords, if
+:math:`i` and :math:`j` are distinct :math:`\mathbf{q}_i` and
+:math:`\mathbf{q}_j` are almost perpendicular.
+
+.. raw:: latex
+
+   \begin{table}
+     \begin{longtable*}{lccc}
+     \toprule
+     \textbf{make} & \textbf{Ordinal} & \textbf{One-Hot} & \textbf{QOE} \\
+     \midrule
+     \endfirsthead
+     Toyota & 1 & $\mathbf{u}_1$ & $\mathbf{q}_1$ \\
+     Honda & 2 & $\mathbf{u}_2$ & $\mathbf{q}_2$ \\
+     Subaru & 3 & $\mathbf{u}_3$ & $\mathbf{q}_3$ \\
+     Nissan & 4 & $\mathbf{u}_4$ & $\mathbf{q}_4$ \\
+     Mitsubishi & 5 & $\mathbf{u}_5$ & $\mathbf{q}_5$ \\
+     \bottomrule
+     \end{longtable*}
+     \caption{Example of Quasiorthonormal Encoding \DUrole{label}{qoe}}
+
+   \end{table}
+
+
+Decoding under QOE would use the
 following formula for decoding :math:`\mathbf{z}`:
 
 .. math::
@@ -356,6 +363,9 @@ operating in :math:`{\mathbb R}^n` we are encoding :math:`K>n` labels.
 
 Implementation
 --------------
+
+Mathematical
+~~~~~~~~~~~~
 
 To facilitate modern vectorized computation packages such as ``numpy``
 and ``tensorflow``, we define the following :math:`n\times K` *change of
@@ -384,26 +394,32 @@ implementation of QOE into these packages. In the examples below, we use
 ``tensorflow`` to test the effectiveness of using QOE over one-hot
 encoding.
 
+numpy
+~~~~~
+tensorflow
+~~~~~~~~~~
+pytorch
+~~~~~~~
+
 Construction of an Quasiorthonormal set
 ---------------------------------------
 
 It is difficult find explicit constructions of quasiorthonormal sets in
-the literature. Several methods are mentioned by
-`Kainen <https://www.researchgate.net/publication/303520147>`__, but
+the literature. Several methods are mentioned by Kainen :cite:`kainan`, but
 these constructions are somewhat theoretical and hard for the lay person
 to follow. There are a number of combinatorial problems related such as
 spherical codes and Steiner Triple Systems, which strive to find optimal
 solutions. As a practical matter, we only need to find fast suboptimal
-solutions so we can use `spherical
-codes <http://neilsloane.com/packings/index.html>`__. Spherical codes
+solutions so we can use spherical
+codes :cite:`sphere`. Spherical codes
 try to find a set of points on the :math:`n`-dimensional hypersphere
 such that the minimum distance between two points is maximized. In most
 constructions of spherical codes, a given point's antipodal point is
 also in that code set. So in order to get a quasiorthogonal set, for
 each pair of antipodal points, only one element of the pair is selected.
 
-Experiment and Demonstration
-----------------------------
+Simple Example and Comparison
+-----------------------------
 
 As an initial experiment, we applied QOE to classification of the MNIST
 handwriting dataset, using the 60000 training examples with 10000 test
@@ -491,6 +507,22 @@ vectors. We used the following additional test models
 The following table is the mean of the accuracy over three training runs
 of the validation data with training data in parentheses
 
+.. raw:: latex
+
+   \begin{table}
+     \begin{longtable*}{lcccc}
+     \toprule
+     \textbf{Number of} & \textbf{One Hot} & \textbf{7-Dimensional} & \textbf{4-Dimensional} \\
+     \textbf{Epochs} & \textbf{Encoding} & \textbf{QOE} & \textbf{QOE} \\
+     \midrule
+     \endfirsthead
+     10 & 97.53\% (97.30\%) & 97.24\% (96.94\%) & 95.65\% (95.15\%) \\
+     20 & 97.68\% (98.02\%) & 97.49\% (97.75\%) & 95.94\% (96.15\%) \\
+     \bottomrule
+     \end{longtable*}
+     \caption{Example of Binary Codes}
+   \end{table}
+
 +--------------------+--------------------+--------------------+--------------------+
 | Number of Epochs   | One Hot Encoding   | 7-Dimensional QO   | 4-Dimensional QO   |
 +====================+====================+====================+====================+
@@ -516,6 +548,9 @@ but this comes at the cost of the number of dimensions used for the
 encoding. Quasiorthoganility with the QO softmax function performs less
 effectively at decoding than orthogonality with the softmax, but reduces
 dimensionality.
+
+Separation capabilites of Softmax Function
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A curious observation is that if you examine the effect of the softmax
 function on negative values along one of the basis vectors, the softmax
@@ -556,13 +591,21 @@ code provided `here <http://neilsloane.com/packings/index.html>`__. The
 accuracy is shown in the following table with training accuracy in
 parentheses.
 
-+--------------------+--------------------+--------------------+--------------------+
-| Number of Epochs   | One Hot Encoding   | 5-Dimensional SC   | 3-Dimensional SC   |
-+====================+====================+====================+====================+
-| 10                 | 97.53% (97.30%)    | 96.51% (96.26%)    | 95.37% (94.83%)    |
-+--------------------+--------------------+--------------------+--------------------+
-| 20                 | 97.68% (98.02%)    | 96.82% (97.11%)    | 95.74% (95.83%)    |
-+--------------------+--------------------+--------------------+--------------------+
+.. raw:: latex
+
+   \begin{table}
+     \begin{longtable*}{lcccc}
+     \toprule
+     \textbf{Number of} & \textbf{One Hot} & \textbf{5-Dimensional} & \textbf{3-Dimensional} \\
+     \textbf{Epochs} & \textbf{Encoding} & \textbf{Spherical Code} & \textbf{Spherical Code} \\
+     \midrule
+     \endfirsthead
+     10 & 97.53\% (97.30\%) & 96.51\% (96.26\%) & 95.37\% (94.83\%) \\
+     20 & 97.68\% (98.02\%) & 96.82\% (97.11\%) & 95.74\% (95.83\%) \\
+     \bottomrule
+     \end{longtable*}
+     \caption{Example of Binary Codes}
+   \end{table}
 
 In this case, the 5-dimensional spherical codes performed close to the
 one-hot encoding by not as closely as the 7-dimension QO codes. The
