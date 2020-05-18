@@ -235,7 +235,7 @@ Quasiorthogonality
 In a suitably high dimensional space, two randomly selected vectors are very likely to be nearly orthogonal or quasiorthogonal. In such an :math:`N`-dimensional vector space, there are sets of :math:`K` vectors which are mutually quasiorthogoanl where `K\\gg N.`. A more formal definition can be stated as follows.
 Given an :math:`\epsilon` two vectors :math:`{\bf x}` and
 :math:`{\bf y}` are said to be *quasiorthogonal* if
-:math:`{|{\bf x}\cdot {\bf y}|\over \|{\bf x}\| \|{\bf y}\|}<\epsilon`.
+:math:`\frac{|{\bf x}\cdot {\bf y}|}{\|{\bf x}\| \|{\bf y}\|}<\epsilon`.
 This extends the orthogonality principle by allowing the inner product
 to not exactly equal zero. As an extension, we can define a
 quasiorthonormal *basis* by a set of normal vectors
@@ -259,7 +259,7 @@ parallels the use of orthonormal basis in one-hot encoding. In machine
 learning, the typical aspects of one hot encoding maps a 
 variable with :math:`n` categories into a set of unit vectors in a 
 :math:`n`-dimensional space: :math:`L=\{l_i\}` for :math:`i=1\ldots n`,
-then the one hot encoding :math:`\mathbb{1}_L:L \mapsto \mathbb{R}^n`
+then the one hot encoding :math:`E_L:L \mapsto \mathbb{R}^n`
 given by :math:`l_i \mapsto \mathbf{u}_i` where :math:`\mathbf{u}_i` is
 an orthonormal basis in :math:`\mathbb{R}^n`. The simplest basis used is
 :math:`\mathbf{u}_i = (0,0,\ldots, 1, 0,\ldots, 0)` where the :math:`1`
@@ -275,7 +275,10 @@ is not easily differentiable which problems in ML learning algorithms
 that require derivatives. To fix this, a *softer* version is used called
 the *softargmax* or now as simply *softmax* and is defined as follows:
 
-.. math::  \mathrm{softmax}(\mathbf{z})_i={e^{z_i}\over\sum_{j=1}^n e^{z_j}}
+.. math::
+   :label: eq:csoftmax
+
+   \mathrm{softmax}(\mathbf{z})_i=\frac{e^{z_i}}{\sum_{j=1}^n e^{z_j}}
 
 for :math:`i=1,2,\ldots,n` and
 :math:`{\bf z}=(z_1, z_2,\ldots, z_n) \in \mathbb{R}^n` where
@@ -292,35 +295,48 @@ orthonormal basis :math:`{\mathbf{u}_i}`, one would map the label
 :math:`j` to :math:`{\mathbf{u}_j}` for encoding where the
 :math:`{\mathbf{u}_i}` no longer have to take the standard basis form.
 To decode an encoded value in this framework, we would take
-:math:`i = \mathrm{argmax}(\mathbf{z}\cdot\mathbf{u}_1,\mathbf{z}\cdot\mathbf{u}_2,\ldots,\mathbf{z}\cdot\mathbf{u}_n)`.
+
+.. math::
+   :label: eq:argmax
+
+   i = \mathrm{argmax}(\mathbf{z}\cdot\mathbf{u}_1,\mathbf{z}\cdot\mathbf{u}_2,\ldots,\mathbf{z}\cdot\mathbf{u}_n).
+
 This reduces to :math:`\mathrm{argmax}\mathbf(z)` for the standard
 basis. Thus, the softmax function can be expressed as the following,
 
-.. math:: \mathrm{softmax}({\bf z})_i={e^{{\bf z}\cdot {\bf u}_i}\over \sum_{j=1}^n e^{{\bf z}\cdot {\bf u}_j}}.
+.. math::
+   :label: eq:gsoftmax
+
+   \mathrm{softmax}({\bf z})_i={e^{{\bf z}\cdot {\bf u}_i}\over \sum_{j=1}^n e^{{\bf z}\cdot {\bf u}_j}}.
 
 Encoding
 ~~~~~~~~
 
-The principle behind QOE is simple. A quasiorthonormal basis is
-substituted for the orthonormal basis described above. More formally,
-we use the quasiorthonormal
-basis :math:`\{{\bf q}_i\}` for the orthonormal basis
-:math:`\{{\bf u}_i\}` used above. Sogiven a
+The principle behind QOE is simple. A quasiorthonormal basis :math:`\{{\bf q}_i\}` is
+substituted for the orthonormal basis :math:`\{{\bf u}_i\}` described above. So given a
 quasiorthonormal basis, we can define a QOE for a set :math:`L=\{l_i\}`
-by :math:`{\mathbb q}(l_i)= {\bf q}_i`. 
+by :math:`l_i \mapsto \mathbf{q}_i`.
 
+Decoding :math:`\mathbf{z}`: under QOE would use a *qargmax* function analogous to the argmax function for one-hot encoding as shown in equation :ref:`eq:qargmax` which is nearly identical to equation :ref:`eq:argmax`.
 
+.. math::
+   :label: eq:qargmax
 
+   i = \mathrm{argmax}(\mathbf{z}\cdot\mathbf{q}_1,\mathbf{z}\cdot\mathbf{q}_2,\ldots,\mathbf{z}\cdot\mathbf{q}_n)
 
-encoded values as unit vectors as shown in Table :ref:`qoe`, where :math:`\mathbf{u}_i` are unit vectors in :math:`\mathbb{R}^5` and
-:math:`{\mathbf{q}_i}` are a set of quasiorthogonal vectors in a
-dimension less than 5. The set :math:`{\mathbf{q}_i}` is
-quasiorthonormal if each :math:`\mathbf{q}_i` is normal
-(:math:`||\mathbf{q}_i||=1`) and
-:math:`|\mathbf{q}_i\cdot \mathbf{q}_j|<\epsilon` for some small
-:math:`\epsilon` value and for :math:`i\ne j`. In otherwords, if
-:math:`i` and :math:`j` are distinct :math:`\mathbf{q}_i` and
-:math:`\mathbf{q}_j` are almost perpendicular.
+Analogous to the softmax function shown of equation :ref:`eq:gsoftmax`, is a *qsoftmax* function which can be expressed as 
+
+.. math::
+   :label: eq:qsoftmax
+
+   \mathrm{qsoftmax}({\bf z})_i={e^{{\bf z}\cdot {\bf q}_i}\over \sum_{j=1}^K
+   e^{{\bf z}\cdot {\bf q}_j}}
+
+The only real difference in the formulation is that while still
+operating in :math:`{\mathbb R}^n` we are encoding :math:`K>n` labels.
+
+Returning to our example of Japanese car makes, Table :ref:`qoe` shows one-hot encoding and QOE of the five manufacturers. In the table, encodings are represented simply as vectors where :math:`\mathbf{u}_i` are unit vectors in :math:`\mathbb{R}^5` and
+:math:`{\mathbf{q}_i}` are a set of quasiorthonormal vectors in :math:`\mathbb{R}^3`. It can be shown that such a quasiorthonormal can be found in :cite:`sphere` with the minimum mutual angle of 66\ :math:`^\circ`. In short, the difference between one-hot encoding and QOE is that the one-hot requires 5 dimensions and in this case QOE requires only 3.
 
 .. raw:: latex
 
@@ -341,35 +357,15 @@ quasiorthonormal if each :math:`\mathbf{q}_i` is normal
 
    \end{table}
 
-
-Decoding under QOE would use the
-following formula for decoding :math:`\mathbf{z}`:
-
-.. math::
-
-   i =
-   \mathrm{argmax}(\mathbf{z}\cdot\mathbf{q}_1,\mathbf{z}\cdot\mathbf{q}_2,\ldots,\mathbf{z}\cdot\mathbf{q}_n)
-
-The analogous softmax function, let's call it *qsoftmax*, would be
-expressed as
-
-.. math::
-
-   \mathrm{qsoftmax}({\bf z})_i={e^{{\bf z}\cdot {\bf q}_i}\over \sum_{j=1}^K
-   e^{{\bf z}\cdot {\bf q}_j}}
-
-The only real difference in the formulation is that while still
-operating in :math:`{\mathbb R}^n` we are encoding :math:`K>n` labels.
-
 Implementation
 --------------
 
 Mathematical
 ~~~~~~~~~~~~
 
-To facilitate modern vectorized computation packages such as ``numpy``
-and ``tensorflow``, we define the following :math:`n\times K` *change of
-coordinates* matrix
+While equations :ref:`eq:qargmax` and :ref:`qsoftmax` describe precisely mathematically how to implement decoding and activation functions. Literal implementation would not exploit the modern vectorized and accelerated computation available in such packages as ``numpy``, ``tensorflow`` and ``pytorch``.
+
+To better exploit built-in functions of these packages, we define the following :math:`n\times K` *change of coordinates* matrix
 
 .. math::
 
@@ -390,16 +386,59 @@ and
 
 This facilitates optimized functions such as ``softmax`` in libraries
 like ``tensorflow`` and using the above matrix enables quick
-implementation of QOE into these packages. In the examples below, we use
-``tensorflow`` to test the effectiveness of using QOE over one-hot
-encoding.
+implementation of QOE into these packages. Not only will using native functions accelerated performance it can exploit features such as auto differentiation built into the native functions. A useful property if one wishes to use the qsoftmax function as an activation function.
+
+Since the matrix manipulation operations and input/output shape definitions differ from package to package, we provide a qsoftmax implementation in several popular packages.
 
 numpy
 ~~~~~
+
+.. code:: python
+
+    def qsoftmax(x, basis):
+        qx = np.matmul(np.asarray(basis),x)
+        return softmax(qx)
+
+.. code:: python
+
+    def qsoftmax(basis):
+        def func(x):
+            qx = np.matmul(np.asarray(basis),x)
+            return softmax(qx)
+        return func
+
+
+
 tensorflow
 ~~~~~~~~~~
+
+.. code:: python
+
+    def qsoftmax(x, basis):
+        qx = tf.matmul(tf.constant(basis),x,transpose_b=True)        
+        return tf.nn.softmax(tf.transpose(qx))
+
+or as a metafunction:   
+
+.. code:: python
+
+    def qsoftmax(basis):
+        def func(x):
+            qx = tf.matmul(tf.constant(basis),x,transpose_b=True)        
+            return tf.nn.softmax(tf.transpose(qx))
+        return func
+
+which takes a quasiorthogonal basis and returns the quasiorthogonal
+softmax function based on the basis. 
+
 pytorch
 ~~~~~~~
+
+.. code:: python
+
+    def qsoftmax(x, basis):
+       qx = torch.mm(torch.tensor(basis), x.unsqueeze(0).t()).t().squeeze()
+       return torch.nn.functional.softmax(qx,dim=0)
 
 Construction of an Quasiorthonormal set
 ---------------------------------------
@@ -408,15 +447,17 @@ It is difficult find explicit constructions of quasiorthonormal sets in
 the literature. Several methods are mentioned by Kainen :cite:`kainan`, but
 these constructions are somewhat theoretical and hard for the lay person
 to follow. There are a number of combinatorial problems related such as
-spherical codes and Steiner Triple Systems, which strive to find optimal
-solutions. As a practical matter, we only need to find fast suboptimal
-solutions so we can use spherical
-codes :cite:`sphere`. Spherical codes
-try to find a set of points on the :math:`n`-dimensional hypersphere
+spherical codes :cite:`wiki:spheres` and Steiner Triple Systems :cite:`wiki:steiner`, which strive to find optimal solutions. These are extremely complicated mathematical constructions and not every optimal solution has been found.
+
+As a practical matter, optimal solutions are not necessary as long as the desired characteristics of the quasiorthonormal basis are obtained. As an example, while an optimal solution finds 28 quasiorthonormal vectors with dot products of 0.5 or under are possible in seven dimensions, you may only need 10 vectors. In other words, a suboptimal solution may yield fewer vectors than are possible for a given dimension, or a larger dimension may be required to obtain the desired number of vectors than is theoretically needed. 
+
+One practical way to construct a quasiorthonormal basis is to use spherical codes which has been studied in greater detail. Spherical codes try to find a set of points on the :math:`n`-dimensional hypersphere
 such that the minimum distance between two points is maximized. In most
 constructions of spherical codes, a given point's antipodal point is
 also in that code set. So in order to get a quasiorthogonal set, for
-each pair of antipodal points, only one element of the pair is selected.
+each pair of antipodal points, only one element of the pair is selected. Perhaps to better understand the relationship, between quasiorthonormal basis and spherical codes is that a set of spherical codes can be constructed by taking every vector in a quasiorthonormal basis and add its antipodal point. 
+
+The area of algorithmically finding a quasiorthonormal basis is scant as is in the related area of finding suboptimal spherical codes. However, one such method was investigated by Gautam and Vaintrob :cite:`Gautam2013ANA`. Perhaps the easiest way to obtain a quasiorthonormal basis is to use spherical codes as described above but obtain the spherical code from the vast compliation of sphere codes by Sloane :cite:`sphere`. 
 
 Simple Example and Comparison
 -----------------------------
@@ -435,21 +476,6 @@ We used a hidden layer with 64 units with a ReLU activation function.
 Next there is a 20% dropout layer to mitigate overtraining, then an
 output layer whose width depends on the encoding used.
 
-As a preliminary, we define a ``qsoftmax`` metafunction:
-
-.. code:: python
-
-    def qsoftmax(basis):
-        def func(x):
-            qx = tf.matmul(tf.constant(basis),x,transpose_b=True)        
-            return tf.nn.softmax(tf.transpose(qx))
-        return func
-
-which takes a quasiorthogonal basis and returns the quasiorthogonal
-softmax function based on the basis. The various transpose operations
-are necessary to conform the inputs and outputs to the shape provided
-and required by the tensorflow model.
-
 For ``tensorflow`` and ``keras``, the base network is the following,
 
 .. code:: python
@@ -462,8 +488,7 @@ For ``tensorflow`` and ``keras``, the base network is the following,
       tf.keras.layers.Activation(tf.nn.softmax)
     ])
 
-We used a separate ``Activation`` layer to make the ``qsoftmax``
-clearer.
+We used a separate ``Activation`` layer to make the use of the``qsoftmax`` metafunction as defined above clearer.
 
 As a sanity test, you can implement the following:
 
@@ -484,7 +509,7 @@ the standard ``softmax`` function. This is useful for troubleshooting if
 you have difficulty.
 
 For the two QOE experiments we labeled the bases for the two
-quasiorthonormal sets ``base4`` and ``base7`` and only took the first 10
+quasiorthonormal sets ``basis4`` and ``basis7`` and only took the first 10
 vectors. We used the following additional test models
 
 .. code:: python
