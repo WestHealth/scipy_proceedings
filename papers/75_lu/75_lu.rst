@@ -10,7 +10,7 @@ Most machine learning models, especially artificial neural networks, require num
 
 .. class:: keywords
 
-   terraforming, desert, numerical perspective
+   machine learning, classification, categorical encoding
 
 ============================================================
 Quasi-orthonormal Encoding for Machine Learning Applications
@@ -135,7 +135,6 @@ shows a comparison of coding between ordinal and one-hot encodings.
 
      \caption{Examples of Ordinal and One-Hot Encodings \DUrole{label}{onehot}}
    \end{table}
-
 
 The advantage is that one hot encoding doesn't induce an implicit
 ordering or between categories. The primary disadvantage is that the
@@ -382,16 +381,21 @@ variant as follows
 
 and
 
-.. math:: \mathrm{qsoftmax}(\mathbf{z}) = \mathrm{softmax}(\mathbf{Qz}).
+.. math::
+   :label: eq:convert
+
+   \mathrm{qsoftmax}(\mathbf{z}) = \mathrm{softmax}(\mathbf{Qz}).
 
 This facilitates optimized functions such as ``softmax`` in libraries
 like ``tensorflow`` and using the above matrix enables quick
 implementation of QOE into these packages. Not only will using native functions accelerated performance it can exploit features such as auto differentiation built into the native functions. A useful property if one wishes to use the qsoftmax function as an activation function.
 
-Since the matrix manipulation operations and input/output shape definitions differ from package to package, we provide a qsoftmax implementation in several popular packages.
+Since the matrix manipulation operations and input/output shape definitions differ from package to package, we provide a qsoftmax implementation in several popular packages. In order to facilitate the most general format possible, in our examples, we will express the quasiorthogonal basis as an list of list, but the input and the output is expressed in the appropriate native class (e.g. :code:`numpy.ndarray` in ``numpy``.
 
 numpy
 ~~~~~
+
+For numpy, the implementation is quite straight forward and follows equation :ref:`eq:convert` almost literally and is given below.
 
 .. code:: python
 
@@ -399,6 +403,8 @@ numpy
         qx = np.matmul(np.asarray(basis),x)
         return softmax(qx)
 
+This can be wrapped in a function factory or metafunction in applications where an unparameterized activation function is required.
+        
 .. code:: python
 
     def qsoftmax(basis):
@@ -407,7 +413,13 @@ numpy
             return softmax(qx)
         return func
 
+The ``softmax`` can be found in ``scipy.special.softmax`` or can easily be written as
 
+.. code:: python
+
+   def np_softmax(x):
+        ex=np.exp(x)
+        return ex/np.sum(ex)
 
 tensorflow
 ~~~~~~~~~~
@@ -462,7 +474,8 @@ The area of algorithmically finding a quasiorthonormal basis is scant as is in t
 Simple Example and Comparison
 -----------------------------
 
-As an initial experiment, we applied QOE to classification of the MNIST
+To demonstrate how QOE can be used in machine learning, we provide a simple experiment/demonstration.
+This demonstration in addition to showing how to construct a classification system using QOE gives an sense of the effect of QOE on accuracy. As an initial experiment, we applied QOE to classification of the MNIST
 handwriting dataset, using the 60000 training examples with 10000 test
 examples. As there are 10 categories, we needed sets of quasiorthonormal
 bases with 10 elements. We took the spherical code for 24 points in
@@ -474,9 +487,12 @@ leading to an angle of a little over 70\ :math:`^\circ`
 
 We used a hidden layer with 64 units with a ReLU activation function.
 Next there is a 20% dropout layer to mitigate overtraining, then an
-output layer whose width depends on the encoding used.
+output layer whose width depends on the encoding used. The following example is implemented using ``tensorflow`` and ``keras``
 
-For ``tensorflow`` and ``keras``, the base network is the following,
+Validating the QSoftmax Function
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We begin by validating the ``qsoftmax`` function as provided above. This is done by first constructing a reference model built on ``tensorflow`` and ``keras`` in the standard way. In fact this example is nearly identical to the presented in the *Quickstart for Beginners* guide :cite:`tensorflow` for ``tensorflow`` with the exception that we employ a separate ``Activation`` for clarity.
 
 .. code:: python
 
@@ -488,9 +504,7 @@ For ``tensorflow`` and ``keras``, the base network is the following,
       tf.keras.layers.Activation(tf.nn.softmax)
     ])
 
-We used a separate ``Activation`` layer to make the use of the``qsoftmax`` metafunction as defined above clearer.
-
-As a sanity test, you can implement the following:
+To validate that the ``qsoftmax`` function and the uses of a ``Lambda`` layer is propery used, the ``qsoftmax`` metafunction is used with the identity matrix to represent the basis. Mathematically, the resultant ``qsoftmax`` function in the ``Lambda`` layer is exactly the ``softmax`` function.  The code is shown below:
 
 .. code:: python
 
@@ -503,14 +517,13 @@ As a sanity test, you can implement the following:
     ])
 
 This should function identically as the reference model because it tests
-that the qsoftmax function operates as expected (which it does for us)
-since applying the identity matrix to ``qsoftmax`` merely converts it to
-the standard ``softmax`` function. This is useful for troubleshooting if
-you have difficulty.
+that the qsoftmax function operates as expected (which it does in this case).
+This is useful for troubleshooting if you have difficulty.
 
-For the two QOE experiments we labeled the bases for the two
-quasiorthonormal sets ``basis4`` and ``basis7`` and only took the first 10
-vectors. We used the following additional test models
+Examples on Quasiorthogonal Basis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For the two QOE experiments we take a set of 10 mutually quasiorthonormal vectors from a four dimensional space and from a seven dimensional space all derived from spherical codes from tables mentioned above and only took 10 vectors (e.g., 7 dimensions offered 28 vectors to choose from). In the four dimensional space, the minimum angle between two basis vectors is 60\ :math:`^\circ` and 70\ :math:`^\circ` in the seven dimensional space. For the code, the basis for each experiment are labeled  ``basis4`` and ``basis7``, respectively. This leads to the following models, ``basis4_model`` and ``basis7_model``.
 
 .. code:: python
 
@@ -529,8 +542,9 @@ vectors. We used the following additional test models
       tf.keras.layers.Lambda(qsoftmax(basis7))
     ])
 
-The following table is the mean of the accuracy over three training runs
-of the validation data with training data in parentheses
+
+Table :ref:`tab:qoe` shows the mean of the accuracy over three training runs
+of the validation data with training data in parentheses.
 
 .. raw:: latex
 
@@ -545,24 +559,11 @@ of the validation data with training data in parentheses
      20 & 97.68\% (98.02\%) & 97.49\% (97.75\%) & 95.94\% (96.15\%) \\
      \bottomrule
      \end{longtable*}
-     \caption{Example of Binary Codes}
+     \caption{Results of MNIST QOE Experiment \DUrole{label}{tab:qoe}}
    \end{table}
 
-+--------------------+--------------------+--------------------+--------------------+
-| Number of Epochs   | One Hot Encoding   | 7-Dimensional QO   | 4-Dimensional QO   |
-+====================+====================+====================+====================+
-| 10                 | 97.53% (97.30%)    | 97.24% (96.94%)    | 95.65% (95.15%)    |
-+--------------------+--------------------+--------------------+--------------------+
-| 20                 | 97.68% (98.02%)    | 97.49% (97.75%)    | 95.94% (96.15%)    |
-+--------------------+--------------------+--------------------+--------------------+
-
-The seven dimensional quasiorthogonal basis (at 70\ :math:`^\circ`),
-performs nearly as well as the one-hot encoded version whereas the four
-dimensional quasiorthogonal basis (at 60\ :math:`^\circ`) case did not
-perform as well. Though 95% vs 98% percent may not seem significant, for
-the MNIST handwriting dataset, this relatively small change in
-performance is how these classification algorithms are judged.
-
+From these results, it is clear that there is some degradation in performance as the number of dimensions is reduced, but clearly QOE can be used leading to a tradeoff between accuracy and resource reduction from the reduction of dimensionality.
+   
 Spherical Encoding
 ------------------
 
@@ -612,7 +613,7 @@ The model tested becomes:
     ])
 
 In addition, we ran a test using the 3 dimension 10 vector spherical
-code provided `here <http://neilsloane.com/packings/index.html>`__. The
+code provided :cite:`sphere`. The
 accuracy is shown in the following table with training accuracy in
 parentheses.
 
@@ -656,3 +657,10 @@ curse of dimensionality.
 
 References
 ----------
+
++---------+
+| Number  |
++=========+
+| 10      |
++---------+
+
