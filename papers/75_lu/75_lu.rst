@@ -362,7 +362,7 @@ Implementation
 Mathematical
 ~~~~~~~~~~~~
 
-While equations :ref:`eq:qargmax` and :ref:`qsoftmax` describe precisely mathematically how to implement decoding and activation functions. Literal implementation would not exploit the modern vectorized and accelerated computation available in such packages as ``numpy``, ``tensorflow`` and ``pytorch``.
+While equations :ref:`eq:qargmax` and :ref:`eq:qsoftmax` describe precisely mathematically how to implement decoding and activation functions. Literal implementation would not exploit the modern vectorized and accelerated computation available in such packages as ``numpy``, ``tensorflow`` and ``pytorch``.
 
 To better exploit built-in functions of these packages, we define the following :math:`n\times K` *change of coordinates* matrix
 
@@ -417,39 +417,44 @@ The ``softmax`` can be found in ``scipy.special.softmax`` or can easily be writt
 
 .. code:: python
 
-   def np_softmax(x):
+   def softmax(x):
         ex=np.exp(x)
         return ex/np.sum(ex)
 
 tensorflow
 ~~~~~~~~~~
 
+The following segment of code is an implementation of the ``qsoftmax`` using ``tensorflow`` functions. By using native ``tensorflow`` functions, the resultant ``qsoftmax`` function will be automatically differentiated in a backwards neural network pass.
+
 .. code:: python
 
     def qsoftmax(x, basis):
-        qx = tf.matmul(tf.constant(basis),x,transpose_b=True)        
+        qx = tf.matmul(tf.constant(basis), x,
+                       transpose_b=True)        
         return tf.nn.softmax(tf.transpose(qx))
 
-or as a metafunction:   
+        The wrapped metafunction version of ``qsoftmax`` is also presented as this will be used below in our example of MNIST handwriting classification employing QOE.
 
 .. code:: python
 
     def qsoftmax(basis):
         def func(x):
-            qx = tf.matmul(tf.constant(basis),x,transpose_b=True)        
+            qx = tf.matmul(tf.constant(basis), x,
+                           transpose_b=True)        
             return tf.nn.softmax(tf.transpose(qx))
         return func
 
-which takes a quasiorthogonal basis and returns the quasiorthogonal
-softmax function based on the basis. 
 
 pytorch
 ~~~~~~~
 
+Presented below is a version of the ``qsoftmax`` function implemented using ``pytorch`` primitives. The use of the ``squeeze`` and ``unsqueeze`` operations convert between a 1-dimensional vector and a 2-dimension matrix having one column. This function is only designed to accept vector inputs. In some models, especially image related models, outputs of some layers maybe multidimensional arrays. If your use case requires a multidimensional imput to the ``qsoftmax`` function the code may need alteration.
+
 .. code:: python
 
     def qsoftmax(x, basis):
-       qx = torch.mm(torch.tensor(basis), x.unsqueeze(0).t()).t().squeeze()
+       qx = torch.mm(torch.tensor(basis), 
+                     x.unsqueeze(0).t()).t().squeeze()
        return torch.nn.functional.softmax(qx,dim=0)
 
 Construction of an Quasiorthonormal set
@@ -513,7 +518,8 @@ To validate that the ``qsoftmax`` function and the uses of a ``Lambda`` layer is
       tf.keras.layers.Dense(64, activation=tf.nn.relu),
       tf.keras.layers.Dropout(0.2),
       tf.keras.layers.Dense(10)
-      tf.keras.layers.Lambda(qsoftmax(numpy.identity(10,dtype=numpy.float32)))
+      tf.keras.layers.Lambda(qsoftmax(numpy.identity(10,
+                                 dtype=numpy.float32)))
     ])
 
 This should function identically as the reference model because it tests
@@ -563,28 +569,36 @@ of the validation data with training data in parentheses.
    \end{table}
 
 From these results, it is clear that there is some degradation in performance as the number of dimensions is reduced, but clearly QOE can be used leading to a tradeoff between accuracy and resource reduction from the reduction of dimensionality.
+
+Extending to Spherical Encodings
+--------------------------------
+
+A Deeper Look at Softmax
+~~~~~~~~~~~~~~~~~~~~~~~~
+In principle, according to equation :ref:`eq:argmax`, the dot product against a basis be it orthonormal or quasiorthonormal recovers the category from a potentially noisy encoded value. If one takes a deeper dive into equations :ref:`eq:gsoftmax` and :ref:`eq:qsoftmax`, it is interesting to see what these functions are doing. Figure :ref:`fig:ortho` shows on the left, randomly selected values in a circle of radius 6. On the right shows the vectors after the softmax function is applied. Clearly with a few stragglers, most points either move very close to either of the basis vectors :math:`(0,1)` or :math:`(1,0)`. For this graphic the radius of 6 is chosen because upon examining the input to the softmax function in the example above, the average magnitude of each component is 5.5. In reality, 6 is probably a conservatively low value. Due to the exponential term in the softmax function, even large components would make the separation more pronounced.
+
+.. figure:: 1.pdf
+
+   Softmax on an orthonormal basis :label:`fig:ortho`
+
+   Similarly, figure :ref:`fig:qortho` shows on the the same type of distribution of randomly selected values and the right shows the effect after a quasiorthonormal softmax is applied with three basis vectors. Since the qsoftmax function would map the two dimensional input into a three dimensional space, for graphics sake, the three dimensional vectors are mapped back down to two dimensions using the quasiorthonormal basis. Again with the exception of a few stragglers, most points move very close to one of the three basis vectors.
+
+.. figure:: 3.pdf
+
+   Softmax on a quasiorthogonal basis :label:`fig:qortho`
    
-Spherical Encoding
-------------------
+It is clear from equation :ref:`eq:gsoftmax` that the exponential term in the numerator really dominate which is why the softmax is effective.  But consider if :math:`\mathbf{z}\cdot\mathbf{u}_i` is much less than zero such as :math:`\mathbf{z}=-5 \mathbf{u}_i`, then the exponential numerator for that term would severely attenuate the output even though the :math:`\mathbf{z}` lies along the same direction as :math:`\mathbf{u}_i`. 
+Since the :math:`\mathbf{z}\cdot\mathbf{u}_j=0` for all other *j*'s, it would still decode to :math:`i`, but because the :math:*i*-th term is so small, any noise could lead to decoding to a different value.
 
-One key to the effectiveness of an encoding method is how well
-categorical values can be decoded in an noisy environment. Orthogonality
-provides excellent decodability especially using the softmax function,
-but this comes at the cost of the number of dimensions used for the
-encoding. Quasiorthoganility with the QO softmax function performs less
-effectively at decoding than orthogonality with the softmax, but reduces
-dimensionality.
+So why bring all this up? Clearly, values encode to negative values along a basis vector would prove problematic. But it offers the prospect of further reducing dimensionality by encoding to no just the basis a vector but also its antipodal vector. To further our graphical example, in figure :ref:`fig:sphere`, we use :math:`(1,0)`, :math:`(0,1)` and their antipodal vectors :math:`(-1,0)` and :math:`(0,-1)` to encode values and apply a softmax using those vectors.
 
-Separation capabilites of Softmax Function
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. figure:: 4.pdf
 
-A curious observation is that if you examine the effect of the softmax
-function on negative values along one of the basis vectors, the softmax
-function severely attenuates it. Therefore, one can construct an
-orthogonal code using both the 1 and -1 values so for standard unit
-vectors, you could encode categorical values to
-:math:`\{\mathbf{u}_i, -\mathbf{u}_i,\}`, reducing the dimensionality by
-half. Of course nothing comes for free, if a prediction gets confused
+            Softmax on encoded values using an orthonormal basis and antipodal points :label:`fig:sphere`
+
+Once again we see the power of the exponential term and most points move very close to one of the four encoding vectors.
+
+Of course nothing comes for free, if a prediction gets confused
 between two antipodal unit vectors, the result could be that they cancel
 out and allow the noise to dictate the resulting category. By contrast,
 for one-hot encoding, the result would get decoded as one of the two
@@ -596,26 +610,28 @@ the basis. The result not only doubles the number of vectors that can be
 used for encoding, it reduces the problem of finding a basis to that of
 finding spherical codes.
 
-Finally, we tested how effective this types of coding is by using an
-orthogonal basis in 5 dimensions and adding the antipodal unit vector to
-produce a set of 10 vectors.
+Spherical Codes
+~~~~~~~~~~~~~~~
 
-The model tested becomes:
+Spherical codes can be used in place of quasiorthonormal codes simply by allowing the :math:`\mathbf{q}_i` to be a collection of spherical codes not necessarily quasiorthonormal basis. Table :ref:`tab:spherecar` shows how the example of the five Japanese car makes could be encoded with a simple spherical code.
 
-.. code:: python
+.. table:: Examples of Spherical Codes :label:`tab:spherecar`
 
-    basis5_model = tf.keras.models.Sequential([
-      tf.keras.layers.Flatten(input_shape=(28, 28)),
-      tf.keras.layers.Dense(64, activation=tf.nn.relu),
-      tf.keras.layers.Dropout(0.2),
-      tf.keras.layers.Dense(5),
-      tf.keras.layers.Lambda(qsoftmax(basis5))
-    ])
+     +-----------+-------------+----------------+
+     |Make       | One-Hot     | Spherical Code |
+     +===========+=============+================+
+     |Toyota     | (1,0,0,0,0) | (1,0,0)        |
+     +-----------+-------------+----------------+
+     |Honda      | (0,1,0,0,0) | (-1,0,0)       |
+     +-----------+-------------+----------------+
+     |Subaru     | (0,0,1,0,0) | (0,1,0)        |
+     +-----------+-------------+----------------+
+     |Nissan     | (0,0,0,1,0) | (0,-1,0)       |
+     +-----------+-------------+----------------+
+     |Mitsubishi | (0,0,0,0,1) | (0,0,1)        |
+     +-----------+-------------+----------------+
 
-In addition, we ran a test using the 3 dimension 10 vector spherical
-code provided :cite:`sphere`. The
-accuracy is shown in the following table with training accuracy in
-parentheses.
+Since spherical codes can substitute directly into the equations for QOE, it is a simple matter to implement spherical codes :math:`\{\mathbf{s}_i\}` instead of quasiorthonormal basis, :math:`\{\mathbf{q}_i\}`. As such it is a simple matter to run the same experiment on the MNIST handwriting samples as we did for QOE. First, a set of codes are defined in an ``ndarray`` called ``code5`` and ``code3``. The variable ``code5`` consists of the standard orthonormal basis in 5 dimensions along with their antipodal unit vector to produce a set of 10 vectors in 5 dimensions. The variable ``code3`` is taken from :cite:`sphere` for the 3 dimensional spherical codes with 10 vectors. Once these codes are defined, they can be substituted for ``basis4`` and ``basis7`` in the sample code above. Table :ref:`tab:spherecode` shows the results of the experiment with training accuracy shown in parentheses.
 
 .. raw:: latex
 
@@ -630,16 +646,13 @@ parentheses.
      20 & 97.68\% (98.02\%) & 96.82\% (97.11\%) & 95.74\% (95.83\%) \\
      \bottomrule
      \end{longtable*}
-     \caption{Example of Binary Codes}
+     \caption{Results of MNIST Spherical Coding Experiment \DUrole{label}{tab:spherecode}}
    \end{table}
 
 In this case, the 5-dimensional spherical codes performed close to the
 one-hot encoding by not as closely as the 7-dimension QO codes. The
 3-dimensional spherical codes performed on par with the 4-dimensional QO
 codes.
-
-Conclusion
-~~~~~~~~~~
 
 While the extreme dimensionality reduction from 10 to 4 or 10 to 3 did
 not yield comparable performance to one-hot encoding. More modest
@@ -649,18 +662,18 @@ dimensions. One should note that, though we went from 10 to 7
 dimensions, we did not fully exploit the space spanned by the
 quasiorthogonal vector set. Otherwise, we would likely have had the
 similar results if the categorical labels had a cardinality of 28 rather
-than 10. Furthermore, as the target encoded space approaches 20 or 30
-dimensions, we have the ability to encode 100,000 or even a million
-labels. So for high cardinality categories, QO encoding and spherical
-encoding provide an efficient categorical encoding while controlling the
-curse of dimensionality.
+than 10.
+
+Conclusion
+----------
+
+The goal of these reduced dimensionality codes is not to improve accuracy, but to provide savings in computation and representation by reducing the dimensionality of the coded category. As an example, in application such as autoencoders and specifically the imputation architectures presented by :cite:`gondara` and :cite:`lu` where the dimensionality not only dictates the number of outputs and inputs but also the number of hidden layers, a reduction in dimensionality has a profound impact on the size of the model used. Beyond that the reduced dimensionality codes such as QOE and spherical codes can address problems such as the curse of dimensionality and HDLSS.
+
+Though for the exercises presented here, the reduction of dimensionality is modest and may not seem worth the trouble. The real benefit of these codes is in extremely high cardinality in the hundreds, thousands and beyond, such as zip codes, area codes, or medical diagnostic codes.
+
+Practically speaking, while algorithms to generate spherical codes and quasiorthonormal sets are few, :cite:`sphere` has a vast complication of spherical codes. At the extreme end, a spherical code with 196560 vectors is available in 24 dimensions, enough to encode nearly 100,000 labels using QOE or 200,000 labels using spherical codes.
+
+In sum, QOE and spherical codes are useful tools to be included in a data scientists tool box along side other established categorical coding techniques.
 
 References
 ----------
-
-+---------+
-| Number  |
-+=========+
-| 10      |
-+---------+
-
