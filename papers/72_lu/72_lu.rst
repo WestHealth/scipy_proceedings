@@ -381,9 +381,9 @@ As a simple example, using flask authentication can be incorporated into a custo
 Security and Compliance
 -----------------------
 
-In our cloud architecture, the bulk of the security and compliance is built into the EC2 instances serving as nodes or in the ALB. By keeping most of the security external to the containers, container images need less customization for security purposes making it easier to support a wide variety of container images and container apps.
+In our cloud architecture, the bulk of the security and compliance is built into the EC2 instances serving as nodes behind the ALB [rewrite]. By keeping most of the security external to the containers, container images need less customization for security purposes making it easier to support a wide variety of container images and container apps.
 
-The preferred method to implement security, compliance, and even maintenance services on an EC2 instance is to install the appropriate software in an Amazon machine image (AMI. By using a custom AMI with all the desired services installed, an fully equipped EC2 instance can be spun up quickly and features such as autoscaling can be applied.
+The preferred method to implement security, compliance, and even maintenance services on an EC2 instance is to install the appropriate software in an Amazon machine image (AMI). By building a customized AMI based off an optimized Amazon (cite) ECS reference AMI but including the desired additional services installed, an fully equipped EC2 instance can be spun up quickly and features such as autoscaling can easily be applied.
 
 Specifics to security and compliance implementations are described in the following subsections including encryption at rest, access controls, auditing and other agents.
 
