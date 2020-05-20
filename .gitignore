@@ -1,7 +1,9 @@
-.DS_Store
+l.DS_Store
 .ipynb_checkpoints
 output
 _build
 *.pyc
 *.swp
 *~
+make_paper.sh
+.gitignore

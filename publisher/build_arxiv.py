@@ -68,7 +68,6 @@ def rst2tex(in_path, out_path):
         from writer.sphinx_highlight import SphinxStyle
 
         preamble += LatexFormatter(style=SphinxStyle).get_style_defs()
-        print (preamble)
         
     settings = {'documentclass': 'article',
                 'use_verbatim_when_possible': True,
