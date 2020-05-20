@@ -40,3 +40,9 @@
   url={https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_boundaries.html},
   year={2020}
 }
+
+The ALB provides logging :ref:`aws:alb:logging` which will log all access to the application containers to an S3 bucket. Because in our architecture all authentication is performed using the ALB all authentication attempts both successful and more importantly failures are also logged to the bucket. Many third party log management tools are configurable to digest logs stored in this manner including Loggly, Splunk, Sumo Logic.
+https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html
+'costa'   # From https://ops.tips/blog/blocking-docker-containers-from-ec2-metadata/
+   # Allow access to tinyproxy on 172.17.0.1, but "fake block" all other traffic (redirect to port 2)
+
