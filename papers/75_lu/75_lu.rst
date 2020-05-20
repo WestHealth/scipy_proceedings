@@ -672,5 +672,7 @@ Practically speaking, while algorithms to generate spherical codes and quasiorth
 
 In sum, QOE and spherical codes are useful tools to be included in a data scientists tool box along side other established categorical coding techniques.
 
+Experiments and code samples are made available at ``github.com/Westhealth/scipy/quasiorthogonal``.
+
 References
 ----------
