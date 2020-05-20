@@ -378,26 +378,51 @@ In developing your own bespoke applications, a layer of authentication can be em
 As a simple example, using flask authentication can be incorporated into a custom :code:`login_required` decorator, so that for any protected URL the request is authenticated before being processed. Once again the decorator could be implemented with code similar to that of `jwt_verify` described above.
 
 
-Security
---------
+Security and Compliance
+-----------------------
+
+
 
 Encryption at Rest
 ++++++++++++++++++
 
-As previoiusly mentioned, persistent storage and associated file system protocol are encrypted give both encryption in transit and encryption at rest for the persistent storage. However, it is also important that the base file system of the EC2 instances are also encrypted to full insure encryption at rest. 
+As previoiusly mentioned, persistent storage and associated file system protocol are encrypted give both encryption in transit and encryption at rest for the persistent storage. However, it is also important that the base file system of the EC2 instances are also encrypted to full insure encryption at rest. There are two important aspects of ensuring encryption at rest for the base file system. First the attached file system such as elastic block storage (EBS) must be encrypted. This is accomplished by selecting encryption when creating the EC2 instance. Fortunately, AWS now offers an option where EBS volumes are encrypted by default for any EBS volumes created in a given account. We highly recommend this option as it will mitigate the chances of misconfiguration.
 
-* Mention encrypted file system (EBS?)
-* Mention encrypting the AMI image.
-
-
-Container Proxy
-+++++++++++++++
-
-Antivirus
-+++++++++
+Furthermore, the Amazon machine images (AMI) used to create EC2 instances must also be encrypted. A common technique for doing so is to build an machine snapshot will all the agents and services desired then encrypt the snapshot. Regardless for what techinque is used. the AMI's should be encrypted to satisfy any requirements for encryption at rest.
 
 Auditing
 ++++++++
+
+
+Beyond security reasons, many regulations such as HIPAA require auditing for compliance.
+
+https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html
+
+Loggly
+
+Splunk
+
+Sumo Logic
+
+Logging Agent
+
+
+Access Control
+
++++++++++
+tiny proxy
+
+iptables
+
+
+Other Useful Agents
+
+++++++++
+Intrusion Detection
+
+SSM MANAGE
+
+ECS Agent
 
 
 
