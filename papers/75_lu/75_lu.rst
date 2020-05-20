@@ -41,7 +41,7 @@ the same as one-hot encoding but does not increase the dimensionality
 of the data to the same degree as one-hot encoding. Historically, QOE
 was considered for a method of encoding words but modern techinques
 such as *word embeddings* are now considered the state of the art
-method of encoding language.
+method for encoding language.
 
 Some advantages to QOE include a reduction of dimensionality over that
 of using one-hot encoding thus limiting effects of the \`\`curse of
@@ -51,7 +51,7 @@ is that it does not induce artificial geometric relationships that can
 cause downstream bias in the results because each label in a category
 remains mathematically near orthogonal to the other labels.
 
-We will briefly survey *classuc* encoding methods, discuss the
+We will briefly survey *classic* encoding methods, discuss the
 theoretical aspects of QOE, and present a detailed example implementation
 of QOE in tensorflow.
 
@@ -84,7 +84,7 @@ Ordinal Encoding
 
 To begin our overview of fundamental encoding methods, we start with
 Ordinal (Label) Encoding. Ordinal encoding is the simplest and perhaps
-most naive approach encoding a categorical feature— one simply
+most naive approach encoding a categorical feature --- one simply
 assigns a number to each member of a category. This is often how data
 from surveys are encoded into spreadsheets for easy storage and
 calculation of basic statistics. An associated data dictionary is used
@@ -94,7 +94,7 @@ female as 2, with a data dictionary as follows:
 :code:``{'male': 1, 'female': 2}``
 
 Suppose we have three categories of ethnic groups: White, Black, and
-Asian. Under ordinal encoding, suppose What is encoded as 1, Black is
+Asian. Under ordinal encoding, suppose White is encoded as 1, Black is
 encoded as 2 and Asian is encoded as 3. If a machine learning
 classification is somehow confused between Asian and White and decides
 to split the difference and report the in-between value (2) which
@@ -218,7 +218,7 @@ Of course, with categorical encoding, the ability to decode an encoded vector ba
 In an application such as categorization or imputation :cite:`gondara`. Retrieving the category from a vector is crucial. In a training a modern classification model, a categorical output is often subject to an activation function which converts a vector into a probability of each category such as a *softmax* function. Essentially, the softmax is a continuous and differential version of a \`\`hard max'' function which would assign a :code:`1` to the vector representing the most likely category and a :code:`0` to all the other categories. The conversion to a probability distribution allows the use of a negative log likelihood loss function rather than the standard root mean squared error.
 
 
-Typically, other classic encoding methods use thresholds to rectify a vector first into a binary or :math:`n`-ary value then decode the vector back to a label in accordance to the encoding. This makes them difficult to use as outputs of machine learning systems such as neural networks due to lack of differentiability. Also, the decoding process is difficult to convert to a probability distribution making the more favorable negative log likelihood or crossentropy loss function more difficult to use.
+Typically, other classic encoding methods use thresholds to rectify a vector first into a binary or :math:`n`-ary value then decode the vector back to a label in accordance to the encoding. This makes them difficult to use as outputs of machine learning systems such as neural networks that rely on gradients due to lack of differentiability. Also, the decoding process is difficult to convert to a probability distribution, making negative log-likelihood or crossentropy loss functions more difficult to use.
 
 
 Theory
@@ -284,7 +284,7 @@ decodes a one-hot encoded vector into a probability density function
 which enables application of negative log likelihood loss functions or
 cross entropy losses.
 
-Though one-hot encoding by the nature of its name uses unit vectors
+Though one-hot encoding uses unit vectors
 with one :code:`1` in the vector hence a *hot* component. The
 formalization of the one hot encoding above allows *any* orthonormal
 basis to be used. So to use a generalized one-hot encoding with
@@ -390,10 +390,10 @@ implementation of QOE into these packages. Not only will using native functions 
 
 Since the matrix manipulation operations and input/output shape definitions differ from package to package, we provide a qsoftmax implementation in several popular packages. In order to facilitate the most general format possible, in our examples, we will express the quasiorthogonal basis as an list of list, but the input and the output is expressed in the appropriate native class (e.g. :code:`numpy.ndarray` in ``numpy``).
 
-numpy
+Numpy
 ~~~~~
 
-For numpy, the implementation is quite straight forward and follows equation :ref:`eq:convert` almost literally and is given below.
+For Numpy, the implementation is straight-forward and follows equation :ref:`eq:convert` almost literally and is given below.
 
 .. code:: python
 
@@ -419,7 +419,7 @@ The ``softmax`` can be found in ``scipy.special.softmax`` or can easily be writt
         ex=np.exp(x)
         return ex/np.sum(ex)
 
-tensorflow
+Tensorflow
 ~~~~~~~~~~
 
 The following segment of code is an implementation of the ``qsoftmax`` using ``tensorflow`` functions. By using native ``tensorflow`` functions, the resultant ``qsoftmax`` function will be automatically differentiated in a backwards neural network pass.
@@ -443,7 +443,7 @@ The wrapped metafunction version of ``qsoftmax`` is also presented as this will 
         return func
 
 
-pytorch
+Pytorch
 ~~~~~~~
 
 Presented below is a version of the ``qsoftmax`` function implemented using ``pytorch`` primitives. The use of the ``squeeze`` and ``unsqueeze`` operations convert between a 1-dimensional vector and a 2-dimension matrix having one column. This function is only designed to accept vector inputs. In some models, especially image related models, outputs of some layers maybe multidimensional arrays. If your use case requires a multidimensional imput to the ``qsoftmax`` function the code may need alteration.
@@ -460,7 +460,7 @@ Construction of an Quasiorthonormal set
 
 It is difficult find explicit constructions of quasiorthonormal sets in
 the literature. Several methods are mentioned by Kainen :cite:`kainan`, but
-these constructions are somewhat theoretical and hard for the lay person
+these constructions are theoretical and hard
 to follow. There are a number of combinatorial problems related such as
 spherical codes :cite:`wiki:spheres` and Steiner Triple Systems :cite:`wiki:steiner`, which strive to find optimal solutions. These are extremely complicated mathematical constructions and not every optimal solution has been found.
 
@@ -584,7 +584,7 @@ Similarly, figure :ref:`fig:qortho` shows on the the same type of distribution o
 
    Softmax on a quasiorthogonal basis :label:`fig:qortho`
    
-It is clear from equation :ref:`eq:gsoftmax` that the exponential term in the numerator really dominate which is why the softmax is effective.  But consider if :math:`\mathbf{z}\cdot\mathbf{u}_i` is much less than zero such as :math:`\mathbf{z}=-5 \mathbf{u}_i`, then the exponential numerator for that term would severely attenuate the output even though the :math:`\mathbf{z}` lies along the same direction as :math:`\mathbf{u}_i`. 
+It is clear from equation :ref:`eq:gsoftmax` that the exponential term in the numerator  dominates which is why the softmax is effective.  But consider if :math:`\mathbf{z}\cdot\mathbf{u}_i` is much less than zero such as :math:`\mathbf{z}=-5 \mathbf{u}_i`, then the exponential numerator for that term would severely attenuate the output even though the :math:`\mathbf{z}` lies along the same direction as :math:`\mathbf{u}_i`. 
 Since the :math:`\mathbf{z}\cdot\mathbf{u}_j=0` for all other *j*'s, it would still decode to :math:`i`, but because the :math:*i*-th term is so small, any noise could lead to decoding to a different value.
 
 So why bring all this up? Clearly, values encode to negative values along a basis vector would prove problematic. But it offers the prospect of further reducing dimensionality by encoding to no just the basis a vector but also its antipodal vector. To further our graphical example, in figure :ref:`fig:sphere`, we use :math:`(1,0)`, :math:`(0,1)` and their antipodal vectors :math:`(-1,0)` and :math:`(0,-1)` to encode values and apply a softmax using those vectors.
@@ -664,7 +664,7 @@ than 10.
 Conclusion
 ----------
 
-These reduced dimensionality codes are not expected to improve accuracy when the training data is plentiful, but to provide savings in computation and representation by reducing the dimensionality of the coded category. As an example, in application such as autoencoders and specifically the imputation architectures presented by :cite:`gondara` and :cite:`lu` where the dimensionality not only dictates the number of outputs and inputs but also the number of hidden layers, a reduction in dimensionality has a profound impact on the size of the model used. Beyond that the reduced dimensionality codes such as QOE and spherical codes can address problems such as the curse of dimensionality and HDLSS where for small sample sizes it may improve accuracy.
+These reduced dimensionality codes are not expected to improve accuracy when the training data is plentiful, but to save computation and representation by reducing the dimensionality of the coded category. As an example, in application such as autoencoders and specifically the imputation architectures presented by :cite:`gondara` and :cite:`lu` where the dimensionality not only dictates the number of outputs and inputs but also the number of hidden layers, a reduction in dimensionality has a profound impact on the size of the model used. Beyond that the reduced dimensionality codes such as QOE and spherical codes can address problems such as the curse of dimensionality and HDLSS where for small sample sizes it may improve accuracy.
 
 Though for the exercises presented here, the reduction of dimensionality is modest and may not seem worth the trouble. The real benefit of these codes is in extremely high cardinality situations on the order of hundreds, thousands and beyond, such as zip codes, area codes, or medical diagnostic codes.
 
