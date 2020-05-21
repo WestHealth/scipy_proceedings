@@ -1,7 +1,6 @@
 :author: Haw-minn Lu
 :email: hlu@westhealth.org
 :institution: Gary and Mary West Health Institute
-:address: San Diego, CA 92037
    
 :author: Adrian Kwong
 :email: akwong@westhealth.org
@@ -160,7 +159,7 @@ The solution to the last requirement is for our provisioner to write an ``.id`` 
 Jupyter 
 +++++++
 
-Unfortunately, unlike JupyterHub, jupyter notebook/lab do not come with a pluggable authentication module. In order to implement validation, the source file :code:`login.py` must be modified. This file is usually located in the :code:`notebook/auth/` directory in your :code:`site-packages` or ``dist-packages`` directory. If you build using a standard docker image such as :code:`jupyter/base-notebook` or any of its derivative notebooks, this directory would be :code:`/opt/conda/lib/python3.x/site-packages` directory. Please note that the specific python version may vary dependent on which version of the docker container is used and whether subsequent additional install modules might force a rollback of python versions.
+Unfortunately, unlike JupyterHub, jupyter notebook/lab do not come with a pluggable authentication module. In order to implement validation, the source file :code:`login.py` must be modified. This file is usually located in the :code:`notebook/auth/` directory in your :code:`site-packages` or ``dist-packages`` directory. Since Jupyter notebook and JupyterLab are not truly separate applications (in fact they are interchangeable using the path ``/tree`` or ``/lab``), the same ``login.py`` file facilitates authentication for both. If you build using a standard docker image such as :code:`jupyter/base-notebook` or any of its derivative notebooks, this directory would be :code:`/opt/conda/lib/python3.x/site-packages` directory. Please note that the specific python version may vary dependent on which version of the docker container is used and whether subsequent additional install modules might force a rollback of python versions.
 
 The specific modification to the :code:`login.py` file involves replacing two methods, the :code:`get` method and the :code:`get_user_token` class method of the :code:`LoginHandler` class.
 
@@ -326,7 +325,9 @@ RStudio
    Inside the RStudio Container :label:`rstudio`
 
 
-Our implementation of RStudio Server on the same cloud platform is non-invasive to the code base, but more complicated architecturally. Since RStudio does not have a way to set the base URL of the application, an :code:`nginx` is necessary to proxy request to RStudio Server using the :code:`proxy_redirect` directive to rewrite the HTTP paths.
+Our implementation of RStudio Server on the same cloud platform is non-invasive to the code base, but more complicated architecturally. Since RStudio does not have a way to set the base URL of the application, a proxy is required to rewrite the HTTPS request paths. We use an :code:`nginx` proxy to rewrite requests to RStudio Server using the :code:`proxy_redirect` directive.
+
+Figure :ref:`rstudio` shows the application structure within the RStudio container. A proxy communicates with the ALB and routes some requests to a custom app used for authentication and handling the health checks and others to the RStudio server. Since communications between the proxy, app and RStudio server are all within the container and not exposed, they do not require encryption to satisfy compliance. A self-signed certificate is created upon container startup that enables ``nginx`` to communicate over HTTPS to the ALB.
 
 For authentication, RStudio Server maintains authentication session information in a cookie. So with :code:`nginx` we capture, the :code:`auth-sign-in` URL and redirect it to an lightweight webapp whose sole function is to authenticate the user, set the cookie and redirect the browser to RStudio Server. Since the app is necessary in this configuration, we also configure the app to respond to a :code:`/ping` request issued by the ALB target group's health check.
 
@@ -357,8 +358,8 @@ The authentication code is nearly identical to the :code:`verify_jwt` function w
 
 The :code:`days` is the number of days til the cookie expires, and :code:`username` is the user name (i.e. :code:`rstudio`). In the above snippet, the cookie is attacked to a Flask response.
 
-VNC Containers
-++++++++++++++
+Virtual Network Computing (VNC) Containers
+++++++++++++++++++++++++++++++++++++++++++
 
 .. figure:: novnc.pdf
 
@@ -368,13 +369,13 @@ There are many desktop apps for Linux which may also be useful to deploy via a w
 
 This is based on the Docker Headless VNC Container project :cite:`headless` as a blueprint using the :code:`xfce4` window manager. Since it appears that the project has been inactive for over a year we adopt its :code:`Dockerfile` as a starting point but do not use the docker images as a building block.
 
-The two major components used are tigerVNC :cite:`tiger` and noVNC :cite:`novnc`. In our container tigerVNC is unchanged and is installed just as it is in the headerless project's :code:`Dockerfile`. The noVNC project comprises a :code:`novnc` and :code:`websockify` component. No changes were made to the :code:`novnc` component except to alter the parameters use to start :code:`websockify`. Therefore the focus of the customization is on the :code:`websockify` component.
+Figure :ref:`vnc` shows the application structure within a headless VNC container. NoVNC :cite:`novnc` is used as a web to vnc proxy which connects via VNC to a local vnc server which in accordance to the Docker Headless VNC Container project is tigerVNC :cite:`tiger`. Through the VNC server graphically oriented operating system commands and applications can be executed. In our container tigerVNC is unchanged and is installed just as it is in the headerless project's :code:`Dockerfile`. The noVNC project comprises a :code:`novnc` and :code:`websockify` component. No changes were made to the :code:`novnc` component except to alter the parameters use to start :code:`websockify`. Therefore the focus of the customization is on the :code:`websockify` component.
 
 Fortunately, :code:`websockify` permits authentication plugins. The plugin is a simple class with an :code:`authenticate` method which accepts the :code:`headers`, :code:`target_host` and :code:`target_port` as parameters. Upon success it returns and on failure it raises an :code:`AuthenticationError` exception. Since the body of the code is essentially the same as the `verify_jwt` method descirbed for jupyter, the code is not repeated here.
 
 It should be noted that in the container by default the VNC server listens on port 5901 and the novnc client listens on port 6901. It is recommended that only port 6901 be exposed so that only the novnc client can directly communicate with the VNC server as the VNC password in this environment is not well protected. By only exposing port 6901, knowledge of the VNC password can not be exploited to bypass the authentication.
 
-Furthermore, the web server within the :code:`websockify` project is located in :code:`websofickyserver.py` and is based on :code:`SimpleHTTPServer`. It may be desirable to create a custom handler or custom :code:`do_GET` method to handle issues such as providing a base URL, health check URL for the ALB's target group, or to implement templating if desired.
+Furthermore, the web server within the :code:`websockify` project is located in :code:`websockifyserver.py` and is based on :code:`SimpleHTTPServer`. It may be desirable to create a custom handler or custom :code:`do_GET` method to handle issues such as providing a base URL, health check URL for the ALB's target group, or to implement templating if desired. A self-signed certificate is generated in a `launch.sh` as `self.pem` which the webserver will automatically detect and run using HTTPS.
 
 Once this base container image is build with those customizations. Applications such as Orange or Falcon can be added, thus not limiting the cloud system to web applications.
 
@@ -389,9 +390,9 @@ As a simple example, using flask authentication can be incorporated into a custo
 Security and Compliance
 -----------------------
 
-In our cloud architecture, the bulk of the security and compliance is built into the EC2 instances serving as nodes behind the ALB [rewrite]. By keeping most of the security external to the containers, container images need less customization for security purposes making it easier to support a wide variety of container images and container apps.
+In our cloud architecture, the bulk of the security and compliance is built into the EC2 instances serving as nodes behind the ALB and built into features of the ALB. By keeping most of the security external to the containers, container images need less customization for security purposes making it easier to support a wide variety of container images and container apps.
 
-The preferred method to implement security, compliance, and even maintenance services on an EC2 instance is to install the appropriate software in an Amazon machine image (AMI). By building a customized AMI based off an optimized Amazon [cite] ECS reference AMI but including the desired additional services installed, an fully equipped EC2 instance can be spun up quickly and features such as autoscaling can easily be applied.
+The preferred method to implement security, compliance, and even maintenance services on an EC2 instance is to install the appropriate software in an Amazon machine image (AMI). By building a customized AMI based off an optimized Amazon ECS reference AMI :cite:`aws:ecs` but including the desired additional services installed, an fully equipped EC2 instance can be spun up quickly and features such as autoscaling can easily be applied.
 
 Specifics to security and compliance implementations are described in the following subsections including encryption at rest, access controls, auditing and other agents.
 
@@ -426,7 +427,7 @@ For the firewall, we use ``iptables`` using the following commands:
    iptables -t nat -A PREROUTING -i docker0 \
       -d 172.17.0.1 -p tcp -j DNAT --to-destination :2
 
-The first command blocks all internet traffic coming from the `docker0` interface (where the containers must route through) to the `eth0` interface which is the external interface. The second command (see :ref:`costa`) blocks access to the node specific metadata service, which typical contains information about the EC2 instance and credentials for that instance.d. Blocking this prevents a compromised container from accessing the metadata about the EC2 instances blocking a potential escalation in privliges to that of the EC2 node. The third and fourth commands allows the container access to the EC2 instance (which in the docker world is IP address `172.17.0.1`) only on port 8888, where the proxy is configured to listen. All other access is routed to port 2 which has no active listeners.
+The first command blocks all internet traffic coming from the `docker0` interface (where the containers must route through) to the `eth0` interface which is the external interface. The second command (see :cite:`costa`) blocks access to the node specific metadata service, which typical contains information about the EC2 instance and credentials for that instance.d. Blocking this prevents a compromised container from accessing the metadata about the EC2 instances blocking a potential escalation in privliges to that of the EC2 node. The third and fourth commands allows the container access to the EC2 instance (which in the docker world is IP address ``172.17.0.1``) only on port 8888, where the proxy is configured to listen. All other access is routed to port 2 which has no active listeners.
 
 On the container side, the environment variables ``http_proxy`` and ``https_proxy`` must be set to forward all http and https request to the EC2 instance at port 8888. In addition the ``no_proxy`` environment variable should be set to allow some traffic not to be forced into the proxy. Of course, ``localhost`` (and corresponding IP address ``127.0.0.1``) do not require proxy as the traffic doesn't leave the container. In addition, the metadata IP address ``169.254.169.254`` should be allowed out so that the ``iptables`` rule regarding the metadata traffic can be enforced. Finally, the IP address ``169.254.169.2`` is used by the ECS agent. 
 
@@ -449,7 +450,7 @@ Auditing
 
 Beyond security reasons, many regulations such as HIPAA require auditing for compliance. Our approach is two fold. We use the ALB logging capabilities to track access to application containers and authentication. We use a logging agent to track potential privlege escalation or other security concerns on the underlying EC2 host.
 
-The ALB provides logging :ref:`aws:alb:logging` which will log all access to the application containers to an S3 bucket. Because in our architecture all authentication is performed using the ALB all authentication attempts both successful and more importantly failures are also logged to the bucket. Many third party log management tools are configurable to digest logs stored in this manner including Loggly, Splunk, Sumo Logic.
+The ALB provides logging :cite:`aws:alb:logging` which will log all access to the application containers to an S3 bucket. Because in our architecture all authentication is performed using the ALB all authentication attempts both successful and more importantly failures are also logged to the bucket. Many third party log management tools are configurable to digest logs stored in this manner including Loggly, Splunk, Sumo Logic.
 
 Another good practice is to set the target S3 bucket in a separate AWS account and only grant privleges to the logging account to write to the bucket but not delete. This ensure that even if a container or the EC2 instance is compromised, the logs can not be tampered with.
 
@@ -485,7 +486,7 @@ Another useful agent to be deployed on the EC2 instance is an intrusion detectio
 Conclusion
 ----------
 
-Presented here is a secure, collaborative infrastructure for deploying a cloud computation resources. The primary purpose of our infrastructure is to provide jupyter in this environment though due to the preference of some of our users Rstudio and other tools are include. Our data science and infrastructure team is small so building a compliant infrastructure that requires little maintenance is paramount. Equally important is to safeguard against opening vulnerabilities due to misconfigurations. By following the suggestions presented here, misconfigurations err on the side of loss of functionality rather than introducing vulnerabilites.
+Presented here is a secure, collaborative infrastructure for deploying a cloud computation resources. The primary purpose of our infrastructure is to provide jupyter in this environment though due to the preference of some of our users RStudio and other tools are include. Our data science and infrastructure team is small so building a compliant infrastructure that requires little maintenance is paramount. Equally important is to safeguard against opening vulnerabilities due to misconfigurations. By following the suggestions presented here, misconfigurations err on the side of loss of functionality rather than introducing vulnerabilites.
 
 The architecture presented here was successful in a recently performed penetration test. While the recommendations and architecture shown here rely heavily on AWS resources. No doubt elements and counterparts can be found in other cloud services such as Google Cloud and Microsoft Azure.
 
