@@ -13,8 +13,9 @@ import io
 
 from distutils import dir_util
 
-from writer import writer
+from writer import writer, Translator
 from conf import papers_dir, output_dir, status_file, static_dir
+from collections import OrderedDict
 
 import options
 
@@ -42,7 +43,172 @@ header = r'''
 
 
 '''
+from docutils.writers.latex2e import LaTeXTranslator
 
+class ArxivTranslator(Translator):
+    def visit_paragraph(self, node):
+        self.end_open_abstract(node)
+
+        if 'abstract' in node['classes'] and not self.abstract_in_progress:
+            self.out.append('\\begin{abstract}')
+            self.abstract_text.append(self.encode(node.astext()))
+            self.abstract_in_progress = True
+
+        elif 'keywords' in node['classes']:
+            self.keywords = self.encode(node.astext())
+            self.out.append('\\keywords{'+self.keywords+'}')
+
+        elif self.non_breaking_paragraph:
+            self.non_breaking_paragraph = False
+
+        else:
+            if self.active_table.is_open():
+                self.out.append('\n')
+            else:
+                self.out.append('\n\n')
+
+    def depart_paragraph(self, node):
+        pass
+    
+    def depart_document(self, node):
+        LaTeXTranslator.depart_document(self, node)
+
+        ## Generate footmarks
+
+        # build map: institution -> (author1, author2)
+        institution_authors = OrderedDict()
+        for auth in self.author_institution_map:
+            for inst in self.author_institution_map[auth]:
+                institution_authors.setdefault(inst, []).append(auth)
+
+
+        # Build a footmark for the corresponding author
+        corresponding_footmark = self.footmark(1)
+
+        # Build a footmark for equal contributors
+        equal_footmark = self.footmark(2)
+
+        # Build one footmark for each institution
+        institute_footmark = {}
+        for i, inst in enumerate(institution_authors):
+            institute_footmark[inst] = self.footmark(i + 3)
+
+        footmark_template = r'\thanks{%(footmark)s %(instutions)}'
+        corresponding_auth_template = r'''%%
+          %(footmark_counter)s\thanks{%(footmark)s %%
+          Corresponding author: \protect\href{mailto:%(email)s}{%(email)s}}'''
+
+        equal_contrib_template = r'''%%
+          %(footmark_counter)s\thanks{%(footmark)s %%
+          These authors contributed equally.}'''
+
+        title = self.paper_title
+        authors = []
+        institutions_mentioned = set()
+        equal_authors_mentioned = False
+        corr_emails = []
+        if len(self.corresponding) == 0:
+            self.corresponding = [self.author_names[0]]
+        for n, auth in enumerate(self.author_names):
+            if auth in self.corresponding:
+                corr_emails.append(self.author_emails[n])
+
+        for n, auth in enumerate(self.author_names):
+            # get footmarks
+            footmarks = ''.join([''.join(institute_footmark[inst]) for inst in self.author_institution_map[auth]])
+            if auth in self.equal_contributors:
+                footmarks += ''.join(equal_footmark)
+            if auth in self.corresponding:
+                footmarks += ''.join(corresponding_footmark)
+            authors += [r'%(author)s$^{%(footmark)s}$' %
+                        {'author': auth,
+                        'footmark': footmarks}]
+
+            if auth in self.equal_contributors and equal_authors_mentioned==False:
+                fm_counter, fm = equal_footmark
+                authors[-1] += equal_contrib_template % \
+                    {'footmark_counter': fm_counter,
+                     'footmark': fm}
+                equal_authors_mentioned = True
+
+            if auth in self.corresponding:
+                fm_counter, fm = corresponding_footmark
+                authors[-1] += corresponding_auth_template % \
+                    {'footmark_counter': fm_counter,
+                     'footmark': fm,
+                     'email': ', '.join(corr_emails)}
+
+            for inst in self.author_institution_map[auth]:
+                if not inst in institutions_mentioned:
+                    fm_counter, fm = institute_footmark[inst]
+                    authors[-1] += r'%(footmark_counter)s\thanks{%(footmark)s %(institution)s}' % \
+                                {'footmark_counter': fm_counter,
+                                 'footmark': fm,
+                                 'institution': inst}
+
+                institutions_mentioned.add(inst)
+
+        ## Add copyright
+
+        # If things went spectacularly wrong, we could not even parse author
+        # info.  Just fill in some dummy info so that we can see the error
+        # messages in the resulting PDF.
+        if len(self.author_names) == 0:
+            self.author_names = ['John Doe']
+            self.author_emails = ['john@doe.com']
+            authors = ['']
+
+        copyright_holder = self.copyright_holder or (self.author_names[0] + ('.' if len(self.author_names) == 1 else ' et al.'))
+        author_notes = r'''%%
+
+          \noindent%%
+          Copyright\,\copyright\,%(year)s %(copyright_holder)s %(copyright)s%%
+        ''' % \
+        {'email': self.author_emails[0],
+         'year': options.options['proceedings']['year'],
+         'copyright_holder': copyright_holder,
+         'copyright': options.options['proceedings']['copyright']['article']}
+
+        authors[-1] += r'\thanks{%s}' % author_notes
+
+
+        ## Set up title and page headers
+
+        if not self.latex_video_url:
+            video_template = ''
+        else:
+            video_template = '\\\\\\vspace{5mm}\\tt\\url{%s}\\vspace{-5mm}' % self.latex_video_url
+
+        title_template = r'\title{%s}\author{%s' \
+                r'%s}\maketitle'
+        title_template = title_template % (title, ', '.join(authors),
+                                           video_template)
+
+        marks = r'''
+          \renewcommand{\leftmark}{%s}
+          \renewcommand{\rightmark}{%s}
+        ''' % (options.options['proceedings']['title']['short'], title.upper())
+        title_template += marks
+
+        self.body_pre_docinfo = [title_template]
+
+        # Save paper stats
+        self.document.stats = {'title': title,
+                               'authors': ', '.join(self.author_names),
+                               'author': self.author_names,
+                               'author_email': self.author_emails,
+                               'author_institution': self.author_institutions,
+                               'author_institution_map' : self.author_institution_map,
+                               'abstract': self.abstract_text,
+                               'keywords': self.keywords,
+                               'copyright_holder': copyright_holder,
+                               'video': self.video_url,
+                               'bibliography':self.bibliography}
+
+        if hasattr(self, 'bibtex') and self.bibtex:
+            self.document.stats.update({'bibliography': self.bibtex[1]})
+
+writer.translator_class=ArxivTranslator
 def rst2tex(in_path, out_path):
 
     dir_util.copy_tree(in_path, out_path)
