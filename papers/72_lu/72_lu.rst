@@ -1,7 +1,8 @@
 :author: Haw-minn Lu
 :email: hlu@westhealth.org
 :institution: Gary and Mary West Health Institute
-
+:address: San Diego, CA 92037
+   
 :author: Adrian Kwong
 :email: akwong@westhealth.org
 :institution: Gary and Mary West Health Institute
@@ -383,23 +384,23 @@ Security and Compliance
 
 In our cloud architecture, the bulk of the security and compliance is built into the EC2 instances serving as nodes behind the ALB [rewrite]. By keeping most of the security external to the containers, container images need less customization for security purposes making it easier to support a wide variety of container images and container apps.
 
-The preferred method to implement security, compliance, and even maintenance services on an EC2 instance is to install the appropriate software in an Amazon machine image (AMI). By building a customized AMI based off an optimized Amazon (cite) ECS reference AMI but including the desired additional services installed, an fully equipped EC2 instance can be spun up quickly and features such as autoscaling can easily be applied.
+The preferred method to implement security, compliance, and even maintenance services on an EC2 instance is to install the appropriate software in an Amazon machine image (AMI). By building a customized AMI based off an optimized Amazon [cite] ECS reference AMI but including the desired additional services installed, an fully equipped EC2 instance can be spun up quickly and features such as autoscaling can easily be applied.
 
 Specifics to security and compliance implementations are described in the following subsections including encryption at rest, access controls, auditing and other agents.
 
 Encryption at Rest
 ++++++++++++++++++
 
-As previoiusly mentioned, persistent storage and associated file system protocol are encrypted give both encryption in transit and encryption at rest for the persistent storage. However, it is also important that the base file system of the EC2 instances are also encrypted to full insure encryption at rest. There are two important aspects of ensuring encryption at rest for the base file system. First the attached file system such as elastic block storage (EBS) must be encrypted. This is accomplished by selecting encryption when creating the EC2 instance. Fortunately, AWS now offers an option where EBS volumes are encrypted by default for any EBS volumes created in a given account. We highly recommend this option as it will mitigate the chances of misconfiguration.
+As previoiusly mentioned, persistent storage and associated file system protocol are encrypted give both encryption in transit and encryption at rest for the persistent storage. However, it is also important that the base file system of the EC2 instances are also encrypted to full ensure encryption at rest. There are two important aspects of ensuring encryption at rest for the base file system. First the attached file system such as elastic block storage (EBS) must be encrypted. This is accomplished by selecting encryption when creating the EC2 instance or within a launch configuration. Fortunately, AWS now offers an account-level option where EBS volumes are encrypted by default for any EBS volumes created in that given account. We highly recommend this option as it will mitigate the chances of misconfiguration.
 
 Furthermore, the AMI used to create EC2 instances must also be encrypted. A common technique for doing so is to build an machine snapshot will all the agents and services desired then encrypt the snapshot. Regardless for what techinque is used. the AMI's should be encrypted to satisfy any requirements for encryption at rest.
 
 Access Control
 ++++++++++++++
 
-Another security concern is controlling the internet access from the container. The reason is two fold. First, controlling access allows us to prevent users from within a container from accessing potentially malicious websites. Second, should a container become comprosed we want to ensure the compromised container could not escalate privileges to the rest of our AWS account. While AWS through the use of security groups and access control lists allow a course ability to regular what destinations are accessible, we favor more fine grain control. 
+Another security concern is controlling the internet access from the container. The reason is two fold. First, controlling access allows us to prevent users from within a container from accessing potentially malicious websites. Second, should a container become compromised we want to mitigate the compromised container's ability to escalate privileges or pivot to other services within the organization. While AWS through the use of security groups and access control lists provide a coarse ability to regulate what destinations are accessible, we favor more fine grain control. 
 
-There are two aspects of this finer grain control, first we use a on host firewall to control external access of the EC2 instance to the internet. Second we funnel all traffic from each container to a proxy. 
+There are two aspects of this finer grain control, first we use an on-host firewall to control outbound access from the hosted containers. Second we funnel all traffic from each container to a proxy. 
 
 For the firewall, we use ``iptables`` using the following commands:
 
@@ -417,9 +418,9 @@ For the firewall, we use ``iptables`` using the following commands:
    iptables -t nat -A PREROUTING -i docker0 \
       -d 172.17.0.1 -p tcp -j DNAT --to-destination :2
 
-The first command blocks all internet traffic coming from the `docker0` interface (where the containers must route through) to the `eth0` interface which is the external interface. The second command (see :ref:`costa`) blocks access to the special AWS metadata IP address. Blocking this prevents a compromised container from accessing the metadata about the EC2 instances blocking a potential escalation in privliges to that of the EC2 node. The third and fourth commands allows the container access to the EC2 instance (which in the docker world is IP address `172.17.0.1`) only on port 8888. All other access is routed to port 2 which has no active listeners.
+The first command blocks all internet traffic coming from the `docker0` interface (where the containers must route through) to the `eth0` interface which is the external interface. The second command (see :ref:`costa`) blocks access to the node specific metadata service, which typical contains information about the EC2 instance and credentials for that instance.d. Blocking this prevents a compromised container from accessing the metadata about the EC2 instances blocking a potential escalation in privliges to that of the EC2 node. The third and fourth commands allows the container access to the EC2 instance (which in the docker world is IP address `172.17.0.1`) only on port 8888, where the proxy is configured to listen. All other access is routed to port 2 which has no active listeners.
 
-On the container side, the environment variables ``http_proxy`` and ``https_proxy`` must be set to forward all http and https request to the EC2 instance at port 8888. In addition the ``no_proxy`` environment variable should be set to allow some traffic not to be foreced into the proxy. Of course, ``localhost`` (and corresponding IP address ``127.0.0.1``) do not require proxy as the traffic doesn't leave the container. In addition, the metadata IP address ``169.254.169.254`` should be allowed out so that the ``iptables`` rule regarding the metadata traffic can be enforced. Finally, the IP address ``169.254.169.2`` is used by the ECS agent. 
+On the container side, the environment variables ``http_proxy`` and ``https_proxy`` must be set to forward all http and https request to the EC2 instance at port 8888. In addition the ``no_proxy`` environment variable should be set to allow some traffic not to be forced into the proxy. Of course, ``localhost`` (and corresponding IP address ``127.0.0.1``) do not require proxy as the traffic doesn't leave the container. In addition, the metadata IP address ``169.254.169.254`` should be allowed out so that the ``iptables`` rule regarding the metadata traffic can be enforced. Finally, the IP address ``169.254.169.2`` is used by the ECS agent. 
 
 Two methods can be used to address the environment variables. Either we can add the environment variables to the task definition when an application service created or it can defined in the container's `Dockerfile` with the following lines:
 
@@ -471,7 +472,7 @@ An antivirus or antimalware agent is also recommended. The antivirus should be o
 *Intrusion Detection*
 ^^^^^^^^^^^^^^^^^^^^^
 
-Another useful agent to be deployed on the EC2 instance is an intrusion detection agent. Like the antivirus agent, an intrusion detection agent that has container awareness capabilities is desireable and should have the capability activated. The intrusion detection agent looks for activities that are anomolous and when high risk activity is detected, it will gather as much information around the incident as it can. We use the open source ``prometheus`` for our intrusion detection.
+Another useful agent to be deployed on the EC2 instance is an intrusion detection agent. Like the antivirus agent, an intrusion detection agent that has container awareness capabilities is desireable and should have the capability activated. The intrusion detection agent looks for activities that are anomolous and when high risk activity is detected, it will gather as much information around the incident as it can. We use ThreatStack for our intrusion detection.
 
 Conclusion
 ----------
@@ -480,4 +481,4 @@ Presented here is a secure, collaborative infrastructure for deploying a cloud c
 
 The architecture presented here was successful in a recently performed penetration test. While the recommendations and architecture shown here rely heavily on AWS resources. No doubt elements and counterparts can be found in other cloud services such as Google Cloud and Microsoft Azure.
 
-Snipets of code, Dockerfile and commands presented here are availble at ``github.com/Westhealth/scipy2020/cloud_infrastructure``.
+Snipets of code, Dockerfile and commands presented here are available at West Health's github repository at  `https://github.com/Westhealth/scipy2020/cloud_infrastructure <https://github.com/Westhealth/scipy2020/cloud_infrastructure/>`_.
