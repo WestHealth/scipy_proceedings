@@ -13,19 +13,45 @@ Securing Your Collaborative Jupyter Notebooks in the Cloud using Container and L
 
 .. class:: abstract
 
-Jupyter has become the go-to platform for developing data applications but data and security concerns, especially when dealing with healthcare, have become paramount for many institutions and applications dealing with sensitive information. How then can we continue to enjoy the data analysis and machine learning opportunities provided by Jupyter and the Python ecosystem while guaranteeing auditable compliance with security and privacy concerns?
-We will describe the architecture and implementation of a cloud based platform based on Jupyter that integrates with Amazon Web Services (AWS) and uses containerized services without exposing the platform to the vulnerabilities present in Kubernetes and JupyterHub. This architecture addresses the HIPAA requirements to ensure both security and privacy of data. The architecture uses an AWS service to provide JSON Web Tokens (JWT) for authentication as well as network control. Furthermore, our architecture enables secure collaboration and sharing of Jupyter notebooks. Even though our platform is focused on Jupyter notebooks and JupyterLab, it also supports R-Studio and bespoke applications that share the same authentication mechanisms. Further, the platform can be extended to other cloud services other than AWS.
+Jupyter has become the go-to platform for developing data applications but data
+and security concerns, especially when dealing with healthcare, have become
+paramount for many institutions and applications dealing with sensitive
+information. How then can we continue to enjoy the data analysis and machine
+learning opportunities provided by Jupyter and the Python ecosystem while
+guaranteeing auditable compliance with security and privacy concerns?  We will
+describe the architecture and implementation of a cloud based platform based on
+Jupyter that integrates with Amazon Web Services (AWS) and uses containerized
+services without exposing the platform to the vulnerabilities present in
+Kubernetes and JupyterHub. This architecture addresses the HIPAA requirements
+to ensure both security and privacy of data. The architecture uses an AWS
+service to provide JSON Web Tokens (JWT) for authentication as well as network
+control. Furthermore, our architecture enables secure collaboration and sharing
+of Jupyter notebooks. Even though our platform is focused on Jupyter notebooks
+and JupyterLab, it also supports R-Studio and bespoke applications that share
+the same authentication mechanisms. Further, the platform can be extended to
+other cloud services other than AWS.
 
 Introduction
 ------------
 
-This paper focuses on secure implementation of Jupyter Notebooks and Jupyter Labs in a cloud based platform and more specifically on Amazon Web Services (AWS) though many architectures and methods described here are applicable to other cloud platforms. 
+This paper focuses on secure implementation of Jupyter Notebooks and Jupyter
+Labs in a cloud based platform and more specifically on Amazon Web Services
+(AWS) though many architectures and methods described here are applicable to
+other cloud platforms. 
 
-Project Jupyter includes Jupyter Hub which provides a proxy and container management. In particular the Zero to Jupyter Hub with Kubernetes project, :cite:`z2k8s` provides a framework to implement Jupyter Hub on a Kubernetes platform.  The drawback is that Jupyter Hub is not equipped to easily secure. In addition, Kubernetes is notoriously difficult to secure and has many vulnerabilities that are not addressed by default.
+Project Jupyter includes Jupyter Hub, which provides a proxy and container
+management. In particular the Zero to Jupyter Hub with Kubernetes project,
+:cite:`z2k8s` provides a framework to implement Jupyter Hub on a Kubernetes
+platform but with many significant security drawbacks. Kubernetes is
+notoriously difficult to secure and has many vulnerabilities that are not
+addressed by default.
 
-The system described herein uses AWS's Elastic Container Service (ECS) for container management and AWS's application load balancer for authentication.
+The system described herein uses AWS's Elastic Container Service (ECS) for
+container management and AWS's application load balancer for authentication.
 
-Described in this paper is an implementation which satisfies privacy and security concerns. However, the reader is advised to tailor the system to suit one's own needs.
+Described in this paper is an implementation which satisfies privacy and
+security concerns. However, the reader is advised to tailor the system to suit
+one's own needs.
 
 Architecture
 ------------
@@ -39,7 +65,11 @@ Cloud Architecture
 
    Cloud Architecture. :label:`cloudfig`
 
-The basic cloud architecture is shown in Fig. :ref:`cloudfig`. It comprises an identity provider (IDP) used to authenticate a user, an application load balancer (ALB) which can be configured to regulate user access through authentication, a collection of elastic cloud computer compute (EC2) instances that are used to instantiate the containers. Finally, ECS manages the containers deployed on the EC2 cluster.
+The basic cloud architecture is shown in Fig. :ref:`cloudfig`. It consists of
+an identity provider (IDP) used to authenticate a user, an application load
+balancer (ALB) to regulate user access through authentication, and a fleet of
+elastic cloud computer compute (EC2) instances to instantiate the containers.
+Finally, ECS manages the containers deployed on the EC2 cluster.
 
 **Elastic Container Service**
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -48,29 +78,61 @@ ECS is a container orchestration service. A container is instantiated as an ECS 
 
 Taking the most naive approach, ECS can be instructed to start a task based on a task definition. After the task has fully started, the host among the EC2 instances and the mapped port (the port on the EC2 node which is mapped to the container port) is known. At this point, one could write a monitoring function to detect when a task has started, retrieve the specific host and mapped port and create a listener rule for the application load balancer.
 
-Instead of this cumbersome procedure, ECS provides another resource called a *service*. A service can manage many aspects of tasks within ECS including the number of tasks and a *target group* associated with the service. For our purposes managing the number means selecting a desired count of 1 or 0 depending on whether the container is running or culled due to inactivity. A target group is a collection of ports of hosts, or serverless resources such as AWS Lambda function to which a listener rule can direct network traffic. In short by specifying a target group to a service, the host and mapped port are automatically assigned to the target group when a task has fully started.
+Instead of this cumbersome procedure, ECS provides another resource called a
+*service*. A service can manage many aspects of tasks within ECS including the
+number of tasks and a *target group* associated with the service. For our
+purposes managing the number means selecting a desired count of 1 or 0
+depending on whether the container is running or has been automatically culled due to inactivity. A
+target group is a collection of host ports or serverless
+AWS Lambda functions, to which a listener rule can direct network traffic. In
+short by specifying a target group to a service, the host and mapped port are
+automatically assigned to the target group when a task has fully started.
 
 **Application Load Balancer**
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-AWS's ALB can comprise multiple listeners to support multiple protocols. To maintain security, enforcement of HTTPS should be maintained either by not including a listener for HTTP or provide an HTTP listener that redirects all requests to HTTPS.
+AWS's ALB can comprise multiple listeners to support multiple protocols. To
+maintain security, enforcement of HTTPS should be maintained either by not
+including a listener for HTTP or providing an HTTP listener that redirects all
+requests to HTTPS.
 
-AWS's ALB, through a listener, is able to direct external HTTPS requests to various components. Based on listener rules, a request can be directed on the basis of both the hostname and the path. As an example, we use a path to specify a user and a service such as jupyter (for example, :code:`domain.com/user_id/jupyter` or :code:`domain.com/user_id/rstudio`), this allows us to give each user their own container.
+AWS's ALB, through a listener, is able to direct external HTTPS requests to
+various components. Based on listener rules, a request can be directed on the
+basis of both the hostname and the path. As an example, we use a path to
+specify a user and a service such as Jupyter (for example,
+:code:`domain.com/user_id/Jupyter` or :code:`domain.com/user_id/rstudio`), this
+allows us to give each user their own container.
 
-Each listener rule maps a path, hostname or both to a particular target group. Since we uses an ECS service, we can assign a particular service to a target group. The service then manages which ports and EC2 instances are part of the target group. 
+Each listener rule maps a path, hostname or both to a particular target group.
+Since we use an ECS service, we can assign a particular service to a target
+group. The service then manages which ports and EC2 instances are part of the
+target group. 
 
-While the ALB can enforce encryption from the end user to the ALB, the container application (e.g., jupyter) should also be configured to listen only for HTTPS. In this manner, the communication from the end user to the ALB is encrypted as is the communication from the ALB to the container application, ensuring end to end encryption.
+While the ALB can enforce encryption from the end user to the ALB, the
+container application (e.g., Jupyter) should also be configured to listen only
+for HTTPS. In this manner, the communication from the end user to the ALB is
+encrypted as is the communication from the ALB to the container application,
+ensuring end to end encryption.
 
-Furthermore the application load balancer is also configured to perform authentication from an OpenID Connect (OIDC) compliant IDP. This eliminates the need for multiple messages to be passed when using either SAML or OAuth. Upon authentication, the ALB attaches three fields to the header of the http request :code:`x-amzn-oidc-accesstoken`, :code:`x-amzn-oidc-identity` and :code:`x-amzn-oidc-data` which can be used by the end application to confirm the user's identity and validate the authentication. An example of this process as implemented in a jupyter notebook is described below.
+Furthermore the application load balancer is also configured to perform
+authentication from an OpenID Connect (OIDC) compliant IDP. This eliminates the
+need for multiple messages to be passed when using either SAML or OAuth. Upon
+authentication, the ALB attaches three fields to the header of the http request
+:code:`x-amzn-oidc-accesstoken`, :code:`x-amzn-oidc-identity` and
+:code:`x-amzn-oidc-data` which can be used by the end application to confirm
+the user's identity and validate the authentication. An example of this process
+as implemented in a Jupyter notebook is described below.
 
-For our IDP, we use Okta since it allows us to federate identity services to additional sign on services. This allows us to onboard collaborators and allow the collaborators to manage their users.
+For our IDP, we use Okta since it allows us to federate identity services to
+additional sign on services. This allows us to onboard collaborators and allow
+the collaborators to manage their users.
 
 **Shared Storage**
 ^^^^^^^^^^^^^^^^^^
 
 In order to facilitate persistence across containers and also collaboration, ECS orchestrates containers on EC2 instances instead of AWS's Fargate product (Fargate facilitates containers in a serverless fashion but does not provide a host to mount an ObjectiveFS file system). Persistent storage can be mounted on the underlying EC2 instances. Individual containers can access the persistent storage by bind mounting the persistent storage. To meet security compliance of encryption at rest, the persistent storage should be encrypted. We elected to use the third party ObjectiveFS for cost reasons though native AWS resources such as elastic file system (EFS) can be used provided that both the file system and the network communications to the file system are encrypted. :cite:`efs` ObjectiveFS is a secure file system backed by AWS simple storage service (S3). It should be noted to meet encryption in transit compliance requirements that any network attached storage must have network communications encrypted. For example, the base network file system (`nfs`) protocol is not.
 
-As a specific example with jupyter notebooks we mount persistent storage as :code:`/media/home/`. For a given user say :code:`user_a` we bind mount :code:`/home/jovyan` to :code:`/media/home/user_a` so that while in the container the user sees :code:`/home/jovyan` the home directory the users files are actually stored in the persistent storage in a :code:`user_a` subdirectory. This configuration has two advantages. Only one persistent volume is needed to support all users' home directories minimizing costs and within the container all users see /home/jovyan thus eliminating the need to build a separate jupyter container image for each user.
+As a specific example with Jupyter notebooks we mount persistent storage as :code:`/media/home/`. For a given user say :code:`user_a` we bind mount :code:`/home/jovyan` to :code:`/media/home/user_a` so that while in the container the user sees :code:`/home/jovyan` the home directory the users files are actually stored in the persistent storage in a :code:`user_a` subdirectory. This configuration has two advantages. Only one persistent volume is needed to support all users' home directories minimizing costs and within the container all users see /home/jovyan thus eliminating the need to build a separate Jupyter container image for each user.
 
 With this configuration, multiple services can use the same home directory. For example, in our R Studio deployment :code:`/home/rstudio` is also mapped to :code:`/media/home/user_a`. Furthermore, we also can provide a persistent volume for shared directories. For example, for all users on :code:`project_a` we bind mount :code:`/home/jovyan/projects/project_a` to :code:`/media/projects/project_a` where the persistent volume is mounted to :code:`/media/projects`.
 
@@ -92,7 +154,7 @@ Container Architecture
 
    Cloud Architecture. :label:`cloudfig`
 
-The architecture in terms of container comprises a persistent hub container, an optional ephemeral provisioner container, and an assortment of semi-persistent application containers such as jupyter notebook. In an alternative deployment, AWS Lambda functions can be functionally substituted for the hub container, but for the sake of simplicity only the container version of the hub is described.
+The architecture in terms of container comprises a persistent hub container, an optional ephemeral provisioner container, and an assortment of semi-persistent application containers such as Jupyter notebook. In an alternative deployment, AWS Lambda functions can be functionally substituted for the hub container, but for the sake of simplicity only the container version of the hub is described.
 
 The application containers are described as semi-persistent as they can be started on demand and culled when one or more inactivity criteria has been reached. This can be achieved by updating the associated service to have a desired count of :code:`1` to start or a desired count of :code:`0` to cull.
 
@@ -114,9 +176,12 @@ Additionally, an option to "decommission" an application can be presented where 
 **Culling**
 ^^^^^^^^^^^
 
-The best practice for culling an application is to have the application upon exiting, set the desired count to :code:`0` of its corresponding service.
+The best practice for culling an application is to have the application upon
+exiting, set the desired count to :code:`0` of its corresponding service.
 
-For the example of jupyter, the start up scripts for both jupyter notebook and jupyter lab contains the following snippet with :code:`main` imported from different places:
+For the example of Jupyter, the start up scripts for both Jupyter notebook and
+Jupyter lab contains the following snippet with :code:`main` imported from
+different places:
 
 .. code:: python
 
@@ -143,14 +208,14 @@ Rather than just exiting after :code:`main` completes, a modified start up scrip
 
 Code to retrieve the :code:`region_name`, :code:`cluster_name`, and :code:`service_name`, are omitted for clarity, but they can be retrieved from environment variables (set in task definition), passed via :code:`sys.argv` or even by calls to :code:`boto3`. Though the first two options are simpler.
 
-The above modification to the start up scripts ensures that when jupyter exits the task count is zero. However, in order for this to be meaningful culling parameters in the jupyter configuration such as :code:`c.NotebookApp.shutdown_no_activity_timeout` :code:`c.MappingKernelManager.cull_connected`, :code:`c.MappingKernelManager.cull_idle_timeout` and :code:`c.MappingKernelManager.cull_interval`, as well as setting a shell timeout (e.g., :code:`TMOUT` environment variable are set) in the event a terminal is open.
+The above modification to the start up scripts ensures that when Jupyter exits the task count is zero. However, in order for this to be meaningful culling parameters in the Jupyter configuration such as :code:`c.NotebookApp.shutdown_no_activity_timeout` :code:`c.MappingKernelManager.cull_connected`, :code:`c.MappingKernelManager.cull_idle_timeout` and :code:`c.MappingKernelManager.cull_interval`, as well as setting a shell timeout (e.g., :code:`TMOUT` environment variable are set) in the event a terminal is open.
 
 Authentication and Applications
 -------------------------------
 
 As mentioned above, the bulk of the authentication is performed by the ALB. However, it is important for the individual application to validate a request forwarded by the ALB, for two reasons. Validation prevents potential security vulnerablities due to a misconfiguration in the system or exposes security vulnerabilities during the initial system debugging. Additionally, validation ensures that the identity of the user is what is expected. The ALB ensures that the user has validly authenticated, but it is up to the application to ensure that the correct user has connected. 
 
-Validation is achieved through the JWT token presented in the :code:`x-amzn-oidc-data` header by the ALB. These JWT tokens are signed by a public key retrievable from AWS insuring that only the ALB could have signed them. Within the JWT token, the :code:`kid` field represents the *key ID* for the public key. To validate, the key ID should be extracted and corresponding public key should be retrieved from AWS. With the public key, the JWT token can then be validated. We use the :code:`python-jose` module available on PyPi. The :code:`sub` field in the JWT token is the same as the OIDC ID which is also presented in the :code:`x-amzn-oidc-identity` field. The application should then verify this is OIDC ID associated with the expected user. 
+Validation is achieved through the JWT token presented in the :code:`x-amzn-oidc-data` header by the ALB. These JWT tokens are signed by a public key retrievable from AWS ensuring that only the ALB could have signed them. Within the JWT token, the :code:`kid` field represents the *key ID* for the public key. To validate, the key ID should be extracted and corresponding public key should be retrieved from AWS. With the public key, the JWT token can then be validated. We use the :code:`python-jose` module available on PyPi. The :code:`sub` field in the JWT token is the same as the OIDC ID which is also presented in the :code:`x-amzn-oidc-identity` field. The application should then verify this is OIDC ID associated with the expected user. 
 
 To deploy an application securely in our infrastructure, in addition to validating the authentication, the application container should meet four more requirements. It should have a configurable base url as the ALB will forward requests to the application with the base url prefix. It should communicate to the ALB over HTTPS to ensure end to end encryption. It should provide a url to respond to pings sent by the ALB for health checks. It should validate that the mounted home container belongs to the user.
 
@@ -159,7 +224,7 @@ The solution to the last requirement is for our provisioner to write an ``.id`` 
 Jupyter 
 +++++++
 
-Unfortunately, unlike JupyterHub, jupyter notebook/lab do not come with a pluggable authentication module. In order to implement validation, the source file :code:`login.py` must be modified. This file is usually located in the :code:`notebook/auth/` directory in your :code:`site-packages` or ``dist-packages`` directory. Since Jupyter notebook and JupyterLab are not truly separate applications (in fact they are interchangeable using the path ``/tree`` or ``/lab``), the same ``login.py`` file facilitates authentication for both. If you build using a standard docker image such as :code:`jupyter/base-notebook` or any of its derivative notebooks, this directory would be :code:`/opt/conda/lib/python3.x/site-packages` directory. Please note that the specific python version may vary dependent on which version of the docker container is used and whether subsequent additional install modules might force a rollback of python versions.
+Unfortunately, unlike JupyterHub, Jupyter notebook/lab do not come with a pluggable authentication module. In order to implement validation, the source file :code:`login.py` must be modified. This file is usually located in the :code:`notebook/auth/` directory in your :code:`site-packages` or ``dist-packages`` directory. Since Jupyter notebook and JupyterLab are not truly separate applications (in fact they are interchangeable using the path ``/tree`` or ``/lab``), the same ``login.py`` file facilitates authentication for both. If you build using a standard docker image such as :code:`jupyter/base-notebook` or any of its derivative notebooks, this directory would be :code:`/opt/conda/lib/python3.x/site-packages` directory. Please note that the specific python version may vary dependent on which version of the docker container is used and whether subsequent additional install modules might force a rollback of python versions.
 
 The specific modification to the :code:`login.py` file involves replacing two methods, the :code:`get` method and the :code:`get_user_token` class method of the :code:`LoginHandler` class.
 
@@ -314,7 +379,7 @@ In addition to the two modified methods, we supply two helper methods :code:`ver
 
         return True
 
-To meet the other requirements for jupyter, the :code:`base_url` configuration needs to be set to ensure that the route is properly interpreted. Furthermore, we use this ``base_url`` as the health check url which responds with a ``302`` code. A self-signed certificate is automatically generated when the container starts and that certificate is then used to configure jupyter to run over HTTPS.
+To meet the other requirements for Jupyter, the :code:`base_url` configuration needs to be set to ensure that the route is properly interpreted. Furthermore, we use this ``base_url`` as the health check url which responds with a ``302`` code. A self-signed certificate is automatically generated when the container starts and that certificate is then used to configure Jupyter to run over HTTPS.
 
 
 RStudio
@@ -331,7 +396,7 @@ Figure :ref:`rstudio` shows the application structure within the RStudio contain
 
 For authentication, RStudio Server maintains authentication session information in a cookie. So with :code:`nginx` we capture, the :code:`auth-sign-in` URL and redirect it to an lightweight webapp whose sole function is to authenticate the user, set the cookie and redirect the browser to RStudio Server. Since the app is necessary in this configuration, we also configure the app to respond to a :code:`/ping` request issued by the ALB target group's health check.
 
-The authentication code is nearly identical to the :code:`verify_jwt` function written above for jupyter. The cookie consists of three pieces, a user ID (which we retain as the default :code:`rstudio` as we retained :code:`jovyan` for the jupyter notebook, to prevent the need to build a separate docker image for each user), the expiry and an HMAC 256 signature, signed with a secret typically stored at :code:`/var/lib/rstudio-server/secure-cookie-key` inside the container. The following snippet of code implements this.
+The authentication code is nearly identical to the :code:`verify_jwt` function written above for Jupyter. The cookie consists of three pieces, a user ID (which we retain as the default :code:`rstudio` as we retained :code:`jovyan` for the Jupyter notebook, to prevent the need to build a separate docker image for each user), the expiry and an HMAC 256 signature, signed with a secret typically stored at :code:`/var/lib/rstudio-server/secure-cookie-key` inside the container. The following snippet of code implements this.
 
 .. code:: python
 
@@ -371,13 +436,15 @@ This is based on the Docker Headless VNC Container project :cite:`headless` as a
 
 Figure :ref:`vnc` shows the application structure within a headless VNC container. NoVNC :cite:`novnc` is used as a web to vnc proxy which connects via VNC to a local vnc server which in accordance to the Docker Headless VNC Container project is tigerVNC :cite:`tiger`. Through the VNC server graphically oriented operating system commands and applications can be executed. In our container tigerVNC is unchanged and is installed just as it is in the headerless project's :code:`Dockerfile`. The noVNC project comprises a :code:`novnc` and :code:`websockify` component. No changes were made to the :code:`novnc` component except to alter the parameters use to start :code:`websockify`. Therefore the focus of the customization is on the :code:`websockify` component.
 
-Fortunately, :code:`websockify` permits authentication plugins. The plugin is a simple class with an :code:`authenticate` method which accepts the :code:`headers`, :code:`target_host` and :code:`target_port` as parameters. Upon success it returns and on failure it raises an :code:`AuthenticationError` exception. Since the body of the code is essentially the same as the `verify_jwt` method descirbed for jupyter, the code is not repeated here.
+Fortunately, :code:`websockify` permits authentication plugins. The plugin is a simple class with an :code:`authenticate` method which accepts the :code:`headers`, :code:`target_host` and :code:`target_port` as parameters. Upon success it returns and on failure it raises an :code:`AuthenticationError` exception. Since the body of the code is essentially the same as the `verify_jwt` method descirbed for Jupyter, the code is not repeated here.
 
 It should be noted that in the container by default the VNC server listens on port 5901 and the novnc client listens on port 6901. It is recommended that only port 6901 be exposed so that only the novnc client can directly communicate with the VNC server as the VNC password in this environment is not well protected. By only exposing port 6901, knowledge of the VNC password can not be exploited to bypass the authentication.
 
 Furthermore, the web server within the :code:`websockify` project is located in :code:`websockifyserver.py` and is based on :code:`SimpleHTTPServer`. It may be desirable to create a custom handler or custom :code:`do_GET` method to handle issues such as providing a base URL, health check URL for the ALB's target group, or to implement templating if desired. A self-signed certificate is generated in a `launch.sh` as `self.pem` which the webserver will automatically detect and run using HTTPS.
 
-Once this base container image is build with those customizations. Applications such as Orange or Falcon can be added, thus not limiting the cloud system to web applications.
+Once this base container image is built with those customizations. Applications
+such as Orange or Falcon can be added, thus not limiting the cloud system to
+web applications.
 
 Custom Applications
 +++++++++++++++++++
@@ -399,8 +466,18 @@ Specifics to security and compliance implementations are described in the follow
 Encryption at Rest
 ++++++++++++++++++
 
-As previoiusly mentioned, persistent storage and associated file system protocol are encrypted give both encryption in transit and encryption at rest for the persistent storage. However, it is also important that the base file system of the EC2 instances are also encrypted to fully ensure encryption at rest. There are two important aspects of ensuring encryption at rest for the base file system. First the attached file system such as elastic block storage (EBS) must be encrypted. This is accomplished by selecting encryption when creating the EC2 instance or within a launch configuration. Fortunately, AWS now offers an account-level option where EBS volumes are encrypted by default for any EBS volumes created in that given account. We highly recommend this option as it will mitigate the chances of misconfiguration.
->>>>>>> 0d077eb728eb153cc464729ef98c18449e634364
+As previoiusly mentioned, persistent storage and associated file system
+protocol are encrypted give both encryption in transit and encryption at rest
+for the persistent storage. However, it is also important that the base file
+system of the EC2 instances are also encrypted to fully ensure encryption at
+rest. There are two important aspects of ensuring encryption at rest for the
+base file system. First the attached file system such as elastic block
+storage (EBS) must be encrypted. This is accomplished by selecting
+encryption when creating the EC2 instance or within a launch configuration.
+Fortunately, AWS now offers an account-level option where EBS volumes are
+encrypted by default for any EBS volumes created in that given account. We
+highly recommend this option as it will mitigate the chances of
+misconfiguration.
 
 Furthermore, the AMI used to create EC2 instances must also be encrypted. A common technique for doing so is to build an machine snapshot will all the agents and services desired then encrypt the snapshot. Regardless for what techinque is used. the AMI's should be encrypted to satisfy any requirements for encryption at rest.
 
@@ -476,18 +553,46 @@ Another useful AWS Agent that can be employed is the AWS Systems Manager Agent (
 *Anti-virus*
 ^^^^^^^^^^^^
 
-An antivirus or antimalware agent is also recommended. The antivirus should be one that is container aware and that the container awareness feature should be active. This would facilitate pinpointing the specific container that may be compromised. Container systems such as docker are not complete virtualizations. Processes that run in a container run as processes in the native host, as such an antivirus agent inside can monitor processes that occur \`\`inside a container''. Container aware antivirus agents makes mitigation in a container environment easier. In our particular configuration, we use Sophos as the antivirus though you may have your own preferences.
+An antivirus or antimalware agent is also recommended. The antivirus should be
+one that is container aware and that the container awareness feature should be
+active. This would facilitate pinpointing the specific container that may be
+compromised. Container systems such as docker are not complete virtualizations.
+Processes that run in a container run as processes in the native host, as such
+an antivirus agent inside can monitor processes that occur \`\`inside a
+container''. Container aware antivirus agents makes mitigation in a container
+environment easier. In our particular configuration, we use Sophos as the
+antivirus but you may have your own preferences.
 
 *Intrusion Detection*
 ^^^^^^^^^^^^^^^^^^^^^
 
-Another useful agent to be deployed on the EC2 instance is an intrusion detection agent. Like the antivirus agent, an intrusion detection agent that has container awareness capabilities is desireable and should have the capability activated. The intrusion detection agent looks for activities that are anomolous and when high risk activity is detected, it will gather as much information around the incident as it can. We use ThreatStack for our intrusion detection.
+Another useful agent to be deployed on the EC2 instance is an intrusion
+detection agent. Like this antivirus agent, an intrusion detection agent that
+has container awareness capabilities is desireable and should have the
+capability activated. The intrusion detection agent looks for activities that
+are anomolous and when high risk activity is detected, it will gather as much
+information around the incident as it can. We use ThreatStack for our intrusion
+detection.
 
 Conclusion
 ----------
 
-Presented here is a secure, collaborative infrastructure for deploying a cloud computation resources. The primary purpose of our infrastructure is to provide jupyter in this environment though due to the preference of some of our users RStudio and other tools are include. Our data science and infrastructure team is small so building a compliant infrastructure that requires little maintenance is paramount. Equally important is to safeguard against opening vulnerabilities due to misconfigurations. By following the suggestions presented here, misconfigurations err on the side of loss of functionality rather than introducing vulnerabilites.
+Presented here is a secure, collaborative infrastructure for deploying a cloud
+computation resources. The primary purpose of our infrastructure is to provide
+Jupyter in this environment though due to the preference of some of our users
+RStudio and other tools are include. Our Data Science and infrastructure team
+is small so building a compliant infrastructure that requires little
+maintenance is paramount. Equally important is to safeguard against opening
+vulnerabilities due to misconfigurations. By following the suggestions
+presented here, misconfigurations err on the side of loss of functionality
+rather than introducing vulnerabilites.
 
-The architecture presented here was successful in a recently performed penetration test. While the recommendations and architecture shown here rely heavily on AWS resources. No doubt elements and counterparts can be found in other cloud services such as Google Cloud and Microsoft Azure.
+The architecture presented here was successful in a recently performed
+penetration test. While the recommendations and architecture shown here rely
+heavily on AWS resources. No doubt elements and counterparts can be found in
+other cloud services such as Google Cloud and Microsoft Azure.
 
-Snipets of code, Dockerfile, commands and other resources presented here and the corresponding poster are available at West Health's github repository at  `https://github.com/Westhealth/scipy2020/cloud_infrastructure <https://github.com/Westhealth/scipy2020/cloud_infrastructure/>`_.
+Snippets of code, Dockerfile, commands and other resources presented here and
+the corresponding poster are available at West Health's github repository at
+`https://github.com/Westhealth/scipy2020/cloud_infrastructure
+<https://github.com/Westhealth/scipy2020/cloud_infrastructure/>`_.
