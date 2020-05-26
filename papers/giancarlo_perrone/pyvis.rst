@@ -1,7 +1,6 @@
 :author: Giancarlo Perrone
 :email: gperrone@westhealth.org
 :institution: West Health Institute
-:bibliography: ourbib
 
 -------------------------------------------
 Network visualizations with Pyvis and VisJS
@@ -166,3 +165,69 @@ Edges can be added all at once by supplying a list of tuples to a call to `add_e
 Layout
 ------
 | In situations where your network involves complex connections, Pyvis allows you to manually explore these relationships with intuitive mouse interactions. Nodes can be dragged into more visible positions if the layout is obstructing the view. 
+| All of this is made possible by the front end engine provided by VisJS. Their extensive documentation defines several options for supplying layout and physics configurations to instances of a network. These physics options are built-in to VisJS, so tweaking the physics of the rendered simulation is as simple as providing the parameters to the specific solver. 
+| We have the liberty of configuring the physics engine from within Pyvis:
+
+.. code-block:: python
+
+   g = Network()
+   g.barnes_hut(
+    gravity=-80000,
+    central_gravity=0.3,
+    spring_length=250,
+    spring_strength=0.001,
+    damping=0.09,
+    overlap=0,
+   )
+   print(g.options.physics)
+   {'enabled': True,
+   'stabilization':
+   <pyvis.physics.Physics.Stabilization
+   object at 0x7f99e6a03f90>,
+   'barnesHut': <pyvis.physics.Physics.barnesHut
+   object at 0x7f99e6de3710>}
+
+| In order to avoid the situation of "guessing" desired parameter values to obtain an optimal physics configuration for your network, VisJS offers a useful interaction for experimenting with theses values. 
+| These interactions can be enabled via Pyvis:
+
+.. code-block:: python
+
+   # choose to only show the physics options
+   g.show_buttons(filter_=["physics"])
+
+.. image:: example5.png
+
+| Here, we choose to display the options for the physics component of the network. Ommitting a filter in the call will display the configuration of the entire network including nodes, edges, layout, and interaction. The JSON options displayed in the visualization represent the current configuration depending on the displayed sliders. You can copy/paste those options to supply your network with custom settings:
+
+.. code-block:: python
+
+   g.set_options(
+      """
+      var options = {
+         "physics": {
+            "repulsion": {
+               "centralGravity": 1.3,
+               "springConstant": 0.08,
+               "nodeDistance": 90,
+               "damping": 0.19
+            },
+            "maxVelocity": 45,
+            "minVelocity": 0.19,
+            "solver": "repulsion",
+            "timestep": 0.34
+         }
+      }
+      """
+   )
+   print(g.options)
+
+.. code-block:: python
+
+   {'physics': {'repulsion': {'centralGravity': 1.3,
+   'springConstant': 0.08,
+   'nodeDistance': 90,
+   'damping': 0.19},
+   'maxVelocity': 45,
+   'minVelocity': 0.19,
+   'solver': 'repulsion',
+   'timestep': 0.34}}
