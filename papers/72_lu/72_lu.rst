@@ -46,36 +46,36 @@ platform but with many significant security drawbacks. Kubernetes is
 notoriously difficult to secure and has many vulnerabilities that are not
 addressed by default.
 
-Many applications have regulatory requirements regarding security and
-compliance including defense, finance and health care. These
-requirements can be characterized in broad strokes as authentication
-(only allowing people who are authorized to access certain resources
-in), encryption (both at rest and in transit), auditability (track
-users' access to the system and to resources) and vulnerability
-mitigation.
+Security is paramount for applications that process sensitive data in areas
+such as defense, finance, and healthcare. Broadly speaking, security
+regulations can be characterized in terms of authentication (verifying the
+credentials of users and their access to resources), encryption (data is
+encrypted at rest and in transit), auditing (providing surveillance of key
+resources) and vulnerability mitigation (antivirus and security updates).
 
-In the architecture section, we describe how our cloud and container
-architecture using an AWS environment with AWS's Elastic Container
-Service (ECS), ensures encryption at rest and in transit of a
-container and to the container and integrate access with an
-application load balancer (ALB) for authentication.
+In the architecture section, we describe how our architecture using AWS Elastic
+Container Service (ECS) facilitates encryption at-rest and in-transit  and
+integrates an application load balancer (ALB) for authentication.
 
-In the applications and authentication section, we take a deeper dive
-into the authentication provided by the ALB using JWT specifically to
-integrate jupyter and RStudio.
+In the Applications and Authentication section, we dive into the 
+details of the ALB and how JSON Web Tokens (JWT) facilitate integration with
+Jupyter and RStudio.
 
-In the security and compliance section, we address addition issues of
-security and compliance such as the encryption of the underlying cloud
-architecture, auditing capabilities, and mitigation of vulnerabilities.
+In the Security and Compliance section, we address the encryption of the
+underlying cloud architecture, auditing capabilities, and mitigation of
+vulnerabilities.
 
-Described in this paper is an implementation which satisfies privacy and
-security concerns. However, the reader is advised to tailor the system to suit
-one's own needs.
+Our specific implementation satisfies privacy and security concerns and can
+serve as a starting point to develop customized solutions for related use
+cases.
 
 Architecture
 ------------
 
-There are two distinct levels of architecture described. The cloud architecture comprises the various cloud services which is the lower layer of virtualization. The container architecture is the top layer virtualization built on top of the cloud architecture.
+There are two distinct levels of architecture described. The cloud architecture
+comprises the various cloud services which is the lower layer of
+virtualization. The container architecture is the top layer virtualization
+built on top of the cloud architecture.
 
 Cloud Architecture
 ++++++++++++++++++
