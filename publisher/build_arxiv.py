@@ -46,6 +46,10 @@ header = r'''
 from docutils.writers.latex2e import LaTeXTranslator
 
 class ArxivTranslator(Translator):
+    def __init__(self, *args, **kwargs):
+        Translator.__init__(self, *args, **kwargs)
+        self.addresses={"Gary and Mary West Health Institute": "La Jolla, CA 92037"}
+
     def visit_paragraph(self, node):
         self.end_open_abstract(node)
 
@@ -114,63 +118,10 @@ class ArxivTranslator(Translator):
                 corr_emails.append(self.author_emails[n])
 
         for n, auth in enumerate(self.author_names):
-            # get footmarks
-            footmarks = ''.join([''.join(institute_footmark[inst]) for inst in self.author_institution_map[auth]])
-            if auth in self.equal_contributors:
-                footmarks += ''.join(equal_footmark)
-            if auth in self.corresponding:
-                footmarks += ''.join(corresponding_footmark)
-            authors += [r'%(author)s$^{%(footmark)s}$' %
-                        {'author': auth,
-                        'footmark': footmarks}]
-
-            if auth in self.equal_contributors and equal_authors_mentioned==False:
-                fm_counter, fm = equal_footmark
-                authors[-1] += equal_contrib_template % \
-                    {'footmark_counter': fm_counter,
-                     'footmark': fm}
-                equal_authors_mentioned = True
-
-            if auth in self.corresponding:
-                fm_counter, fm = corresponding_footmark
-                authors[-1] += corresponding_auth_template % \
-                    {'footmark_counter': fm_counter,
-                     'footmark': fm,
-                     'email': ', '.join(corr_emails)}
-
-            for inst in self.author_institution_map[auth]:
-                if not inst in institutions_mentioned:
-                    fm_counter, fm = institute_footmark[inst]
-                    authors[-1] += r'%(footmark_counter)s\thanks{%(footmark)s %(institution)s}' % \
-                                {'footmark_counter': fm_counter,
-                                 'footmark': fm,
-                                 'institution': inst}
-
-                institutions_mentioned.add(inst)
-
-        ## Add copyright
-
-        # If things went spectacularly wrong, we could not even parse author
-        # info.  Just fill in some dummy info so that we can see the error
-        # messages in the resulting PDF.
-        if len(self.author_names) == 0:
-            self.author_names = ['John Doe']
-            self.author_emails = ['john@doe.com']
-            authors = ['']
-
-        copyright_holder = self.copyright_holder or (self.author_names[0] + ('.' if len(self.author_names) == 1 else ' et al.'))
-        author_notes = r'''%%
-
-          \noindent%%
-          Copyright\,\copyright\,%(year)s %(copyright_holder)s %(copyright)s%%
-        ''' % \
-        {'email': self.author_emails[0],
-         'year': options.options['proceedings']['year'],
-         'copyright_holder': copyright_holder,
-         'copyright': options.options['proceedings']['copyright']['article']}
-
-        authors[-1] += r'\thanks{%s}' % author_notes
-
+            inst = ''.join(self.author_institution_map[auth])
+            address = self.addresses[inst]
+            email = self.author_emails[n]
+            authors.append(f"{auth}\\\\\n{inst}\\\\\n{address}\\\\\n\\texttt{{{email}}}\\\\\n")
 
         ## Set up title and page headers
 
@@ -181,14 +132,8 @@ class ArxivTranslator(Translator):
 
         title_template = r'\title{%s}\author{%s' \
                 r'%s}\maketitle'
-        title_template = title_template % (title, ', '.join(authors),
+        title_template = title_template % (title, '\\And '.join(authors),
                                            video_template)
-
-        marks = r'''
-          \renewcommand{\leftmark}{%s}
-          \renewcommand{\rightmark}{%s}
-        ''' % (options.options['proceedings']['title']['short'], title.upper())
-        title_template += marks
 
         self.body_pre_docinfo = [title_template]
 
@@ -201,7 +146,6 @@ class ArxivTranslator(Translator):
                                'author_institution_map' : self.author_institution_map,
                                'abstract': self.abstract_text,
                                'keywords': self.keywords,
-                               'copyright_holder': copyright_holder,
                                'video': self.video_url,
                                'bibliography':self.bibliography}
 
@@ -212,8 +156,11 @@ writer.translator_class=ArxivTranslator
 def rst2tex(in_path, out_path):
 
     dir_util.copy_tree(in_path, out_path)
-
+    
+    status_file   = os.path.join(static_dir, "ready.sty")
     base_dir = os.path.dirname(__file__)
+    out_file = shutil.copy(status_file, out_path)
+    os.rename(out_file, os.path.join(out_path, 'status.sty'))
     scipy_style = os.path.join(base_dir, '_static/arxiv.sty')
     shutil.copy(scipy_style, out_path)
     preamble = u'''\\usepackage{arxiv}\n\\usepackage{scipy}'''
