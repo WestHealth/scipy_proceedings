@@ -171,6 +171,9 @@ Layout
 .. code-block:: python
 
    g = Network()
+   # physics solvers supported: 
+   # barnesHut, forceAtlas2Based, repulsion,
+   # hierarchicalRepulsion
    g.barnes_hut(
     gravity=-80000,
     central_gravity=0.3,
@@ -187,8 +190,8 @@ Layout
    'barnesHut': <pyvis.physics.Physics.barnesHut
    object at 0x7f99e6de3710>}
 
-| In order to avoid the situation of "guessing" desired parameter values to obtain an optimal physics configuration for your network, VisJS offers a useful interaction for experimenting with theses values. 
-| These interactions can be enabled via Pyvis:
+| In order to avoid the scenario of "guessing" parameter values for an optimal network physics configuration, VisJS offers a useful interaction for experimenting with theses values. 
+| These interactions are enabled via Pyvis:
 
 .. code-block:: python
 
@@ -197,7 +200,7 @@ Layout
 
 .. image:: example5.png
 
-| Here, we choose to display the options for the physics component of the network. Ommitting a filter in the call will display the configuration of the entire network including nodes, edges, layout, and interaction. The JSON options displayed in the visualization represent the current configuration depending on the displayed sliders. You can copy/paste those options to supply your network with custom settings:
+| Here, we choose to display the options for the physics component of the network. Omitting a filter in the call will display the configuration of the entire network including nodes, edges, layout, and interaction. The JSON options displayed in the visualization represent the current configuration depending on the displayed sliders. You can copy/paste those options to supply your network with custom settings:
 
 .. code-block:: python
 
@@ -231,3 +234,25 @@ Layout
    'minVelocity': 0.19,
    'solver': 'repulsion',
    'timestep': 0.34}}
+
+| The methods of a Network instance aim to construct an internal structure compatible with VisJS, demonstrated by the consistent pattern of JSON outputs seen above.
+
+NetworkX Support
+----------------
+Although Pyvis supports its own methods for constructing a network data structure, you might feel more comfortable using the more established and dedicated NetworkX package. Pyvis takes this into account by offering a way to define your data as a NetworkX graph instance to then supply to a call to Pyvis.
+
+.. code-block:: python
+
+   import networkx as nx
+   from pyvis.network import Network
+   
+   nxg = nx.random_tree(20)
+   g=Network(directed=True)
+   g.from_nx(nxg)
+   g.show("networkx.html")
+
+.. image:: example6.png
+
+| Pyvis current behavior recognizes the basic topology of a NetworkX graph, not accounting for any custom attributes provided. Any other attributes like node color, size, and layout would need to be manually added to the resulting Pyvis graph.
+| Future plans are to fully integrate NetworkX in order to completely interpret them so attributes carry over to resulting Pyvis visualizations.
+
