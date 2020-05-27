@@ -254,5 +254,9 @@ Although Pyvis supports its own methods for constructing a network data structur
 .. image:: example6.png
 
 | Pyvis current behavior recognizes the basic topology of a NetworkX graph, not accounting for any custom attributes provided. Any other attributes like node color, size, and layout would need to be manually added to the resulting Pyvis graph.
-| Future plans are to fully integrate NetworkX in order to completely interpret them so attributes carry over to resulting Pyvis visualizations.
+| Future plans are to fully integrate NetworkX graphs to fully interpret them, preserving attributes in the resulting Pyvis visualizations.
+
+Jupyter Support
+---------------
+
 
