@@ -8,7 +8,7 @@ Network visualizations with Pyvis and VisJS
 
 .. class:: abstract
 
-   Pyvis is a Python module that enables visualizing and interactively manipulating network graphs in the Jupyter notebook, or as a standalone web application. Pyvis is built on top of the powerful and mature VisJS JavaScript library, which allows for fast and responsive interactions while also abstracting away the low-level JavaScript and HTML. This means that elements of the rendered graph visualization, such as node/edge attributes can be specified within Python and shipped to the JavaScript layer for VisJS to render. This declarative approach makes it easy to quickly draft up graph visualizations to begin exploring relationships in data. In addition, Pyvis offers a wide variety of customizability like the ability to assign visual node and edge properties such as colors, sizes, and hover tooltips. The front-end physics engine is also configurable from a Python interface, allowing for the fine-tuning of a Graph layout. The interactivity and ease of use makes Pyvis a powerful tool for any data exploration project, which we will demonstrate by visualizing a simple experiment involving the relationships between the musical artists in a user’s Spotify library. 
+   Pyvis is a Python module that enables visualizing and interactively manipulating network graphs in the Jupyter notebook, or as a standalone web application. Pyvis is built on top of the powerful and mature VisJS JavaScript library, which allows for fast and responsive interactions while also abstracting away the low-level JavaScript and HTML. This means that elements of the rendered graph visualization, such as node/edge attributes can be specified within Python and shipped to the JavaScript layer for VisJS to render. This declarative approach makes it easy to quickly draft up graph visualizations to begin exploring relationships in data. In addition, Pyvis offers a wide variety of customizability like the ability to assign visual node and edge properties such as colors, sizes, and hover tooltips. The front-end physics engine is also configurable from a Python interface, allowing for the fine-tuning of a Graph layout. In this paper, we outline the various use cases of Pyvis with examples to demonstrate features applicable to any analysis workflow. A brief overview of Pyvis' implementation will also be presented to present how a front-end binding is accomplished through simple Pyvis calls. 
 
 
 .. class:: keywords
@@ -258,5 +258,50 @@ Although Pyvis supports its own methods for constructing a network data structur
 
 Jupyter Support
 ---------------
+For efficient prototyping of visualized graphs, Pyvis aims to utilize Jupyter's front-end IFrame features to embed the graph in a notebook output cell. Simply passing in a notebook argument during instantiation lets Pyvis know that the call to `show()` should write the HTML and serve as an IFrame.  
 
+|
+
+.. image:: example7.png
+
+| One thing to keep in mind is that an HTML file is always generated due to the dependence on the VisJS JavaScript bindings.
+
+Under the Hood
+--------------
+VisJS simplifies their definition of a network to a declarative set of objects. Nodes, Edges, and an Options JSON object are given to the VisJS Network constructor. The following basic example from their documentation proves this:
+
+.. code-block:: JavaScript
+
+   // create an array with nodes
+   var nodes = new vis.DataSet([
+      {id: 1, label: 'Node 1'},
+      {id: 2, label: 'Node 2'},
+   ]);
+
+   // create an array with edges
+   var edges = new vis.DataSet([
+      {from: 1, to: 2},
+   ]);
+
+   // create a network
+   var container = document.getElementById('mynetwork');
+
+   // provide the data in the vis format
+   var data = {
+      nodes: nodes,
+      edges: edges
+   };
+   var options = {};
+
+   // initialize your network!
+   var network = new vis.Network(container, data, options);
+
+| This pattern makes Jinja templating an obvious candidate for generalizing a set of JavaScript declarations. VisJS documentation provides a complete set of supported attributes for each data structure, so incorporating them into the Python layer involves representing each object as Python objects which are then serialized and sent to Jinja to handle the templating.
+| A simple example of this process in action is outlined below:
+
+.. code-block:: python
+
+   self.html = template.render(nodes=nodes, edges=edges)
+
+| In this case, a template HTML file is rendered with node and edge data matching a format compatible with a VisJS Network instance.  
 
