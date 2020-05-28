@@ -9,7 +9,7 @@ Network visualizations with Pyvis and VisJS
 
 .. class:: abstract
 
-   Pyvis is a Python module that enables visualizing and interactively manipulating network graphs in the Jupyter notebook, or as a standalone web application. Pyvis is built on top of the powerful and mature VisJS JavaScript library, which allows for fast and responsive interactions while also abstracting away the low-level JavaScript and HTML. This means that elements of the rendered graph visualization, such as node/edge attributes can be specified within Python and shipped to the JavaScript layer for VisJS to render. This declarative approach makes it easy to quickly draft up graph visualizations to begin exploring relationships in data. In addition, Pyvis offers a wide variety of customizability like the ability to assign visual node and edge properties such as colors, sizes, and hover tooltips. The front-end physics engine is also configurable from a Python interface, allowing for the fine-tuning of a Graph layout. In this paper, we outline the various use cases of Pyvis with examples to demonstrate features applicable to any analysis workflow. A brief overview of Pyvis' implementation will also be presented to present how a front-end binding is accomplished through simple Pyvis calls. 
+   Pyvis is a Python module that enables visualizing and interactively manipulating network graphs in the Jupyter notebook, or as a standalone web application. Pyvis is built on top of the powerful and mature VisJS JavaScript library, which allows for fast and responsive interactions while also abstracting away the low-level JavaScript and HTML. This means that elements of the rendered graph visualization, such as node/edge attributes can be specified within Python and shipped to the JavaScript layer for VisJS to render. This declarative approach makes it easy to quickly explore graph visualizations and investigate data relationships. In addition, Pyvis is highly customizable so that colors, sizes, and hover tooltips can be assigned to the rendered graph. The network graph layout is controlled by a front-end physics engine that is configurable from a Python interface, allowing for the detailed placement of the graph elements. In this paper, we outline use cases for Pyvis with specific examples to highlight key features for any analysis workflow. A brief overview of Pyvis' implementation describes how the Python front-end binding uses simple Pyvis calls. 
 
 
 .. class:: keywords
@@ -19,24 +19,25 @@ Network visualizations with Pyvis and VisJS
 Introduction
 ------------
 
-Successful Data Science pivots upon discovering meaningful relationships in data using intuitive visualizations. Visually representing these links helps to better understand the data and make data driven decisions. They are also intuitive and induce insight, offering a simple node-link structure, which can quickly expose patterns at a glance. Many research areas take advantage of the insight that network analysis techniques can offer. Fields in social networking, cognitive studies, telecommunications, and biological systems all leverage the applications of network theory and computation. Representing these relationships using a network graph is a common approach, but generating an interactive and fluid graph visualization can be a challenge, especially with large datasets. We introduce Pyvis, based upon the mature VisJS :cite:`visjs` JavaScript library which enables fluid and interactive visualizations of complex network graphs. Pyvis seeks to simplify the interactive process by implementing an existing JavaScript graphics library to abstract away the low-level front end components, keeping the construction of these network data structures limited to a Python scope.
+Successful Data Science is about discovering meaningful relationships in data. Visually representing these relationships using a network graph helps to accelerate understanding and make data driven decisions. Many research areas take advantage of the insight that network analysis techniques can offer. Fields in social networking, cognitive studies, telecommunications, and biological systems all leverage the applications of network theory and computation. Representing these relationships using a network graph is fundamental to all approaches, but generating an interactive and fluid graph visualization can be challenging, especially for large datasets. We introduce Pyvis, based upon the mature VisJS :cite:`visjs` JavaScript library which enables fluid and interactive visualizations of complex network graphs. Pyvis seeks to simplify the interactive process by implementing an existing JavaScript graphics library to abstract away the low-level front end components, leaving the construction of these network data structures to Python.
 
-The structure of a Pyvis network data structure aligns with the patterns expected by a VisJS object. This makes it easy to interpret and implement the underlying data structures from the Python layer, since the actual front end component is generated by the JavaScript library. A resulting static HTML document demonstrates the visual representation of a defined network, enveloping interactive components such as dragging, zooming, hovering, and clicking in order to offer the most amount of context possible. Extremely dense and complex networks benefit from this approach since existing network visualization tools are often static in nature, limiting the amount of visual context offered during data exploration. 
+The Pyvis network data structure matches the JavaScript VisJS object. This makes it easy to interpret and implement the underlying data structures from the Python layer, since the actual front end component is generated by the JavaScript library. A resulting static HTML document shows the network graph, with interactions such as dragging, zooming, hovering, and clicking. These interactions help visualize dense complex networks that are hard to explore using static graphics.   
 
-Prior to being made open source, Pyvis has been used extensively in internal data discovery projects to quickly explore and recognize patterns. We began development to serve as the front end component for an internal Data Reduction Network project. While we maintained an efficient data structure to represent the trends of hundreds of survey responses, our need for the visual capture of additional metadata lacked a solution. Initial approaches lacked an interactive factor, limiting our analysis in scope. Pyvis made it easy to abstract our existing data structure to just nodes and edges with our desired attributes. The visualization was then handed off to the VisJS layer to interpret the resulting data structure to give us a nice and fluid visual where we could really see the level of detail in each node and edge in our network. In this paper, we describe Pyvis under the hood and demonstrate key examples of how to create the data structures which result in the desired visualizations.
+Before open-sourcing Pyvis, we used it successfully to understand relationships among hundreds of variables in a complex survey. Although we maintained an efficient data structure to represent the trends in the survey responses, we still needed a way to visualize and interact with additional metadata. Pyvis made it easy to abstract our existing data structure into nodes and edges with our desired metadata and then render the visualization with VisJS to easily identify the interrelationships. In this paper, we describe the design of Pyvis with examples showing the data structures which are rendered by VisJS.
 
 [In the next section, we discuss... Then we talk about layout...
 
 Pyvis Usage
 -----------
-Getting started with Pyvis is as simple as having an installation of the Python language and the Pyvis package. It is recommended to visit the project documentation website :cite:`pyvis` in order to see the full requirements and installation procedure. All of the following examples will utilize standard data structures that should be familiar to anyone with some amount of Python knowledge. Pyvis’ interaction with the popular NetworkX package :cite:`networkx` will be demonstrated as well, although its current state is somewhat limited. The basic Network class is used to hold information about the internal graph and front end properties. All networks must be instantiated as a Network class instance:
+
+Installing Pyvis is straight-forward with details at the project documentation website :cite:`pyvis`. All of the following examples will utilize familiar Python data structures with some connections to the popular and powerful NetworkX package :cite:`networkx`. The basic ``Network`` class is the container for graph and front end properties. All networks must be instantiated as a ``Network`` class instance:
 
 .. code-block:: python
 
    from pyvis.network import Network
    g = Network()
 
-Nodes can be added by providing an id and an optional label for visual aid. Note that node ids must be numerical or a string.
+Nodes can be added by providing an integer or string ``id`` and an optional label.
 
 .. code-block:: python
    
@@ -57,7 +58,7 @@ Nodes can be added by providing an id and an optional label for visual aid. Note
    }
 
 
-A list of nodes could be supplied to the `add_nodes` method:
+The ``add_nodes`` method consumes a list of nodes:
 
 .. code-block:: python
    
@@ -65,7 +66,7 @@ A list of nodes could be supplied to the `add_nodes` method:
    g.add_nodes(nodes) 
    g.add_nodes("hello")
 
-Keyword arguments can be used to add properties to the nodes in Network:
+Keyword arguments can be used to add properties to the nodes in ``Network``:
 
 .. code-block:: python
 
@@ -83,7 +84,7 @@ Keyword arguments can be used to add properties to the nodes in Network:
 .. image:: example1.png
   :width: 100px
 
-| There are various node properties that can be set while constructing a network. These properties are meant to help the resulting visualization provide as much context as possible in regards to node metadata. These properties are defined as:
+| The following node properties influence the resulting visualization:
 
 * size - The raw circumference of a single node
 * value - Circumference of node but scaled according to all values
@@ -116,12 +117,12 @@ Edges can be added all at once by supplying a list of tuples to a call to `add_e
 
 Layout
 ------
-| In situations where your network involves complex connections, Pyvis allows you to manually explore these relationships with intuitive mouse interactions. Nodes can be dragged into more visible positions if the layout is obstructing the view. 
-| All of this is made possible by the front end engine provided by VisJS. Their extensive documentation defines several options for supplying layout and physics configurations to instances of a network. These physics options are built-in to VisJS, so tweaking the physics of the rendered simulation is as simple as providing the parameters to the specific solver. 
+| In situations where your network involves complex connections, Pyvis allows you to manually explore these relationships with intuitive mouse interactions. Nodes can be dragged into more visible positions if the view is obstructed.  
+| All of this is made possible by the front end engine provided by VisJS. Their extensive documentation defines several options for supplying layout and physics configurations to instances of a network. These physics options are fundamental to VisJS, so tweaking the physics of the rendered simulation is as simple as providing the parameters to the specific solver. 
 
-The physics options dictates how a user can interact with the objects in the graph. The intent of the physic options is to make manipulating graph objects feel more intuitive when moving nodes around. As an example, the user can manipulate a portion of a graph that is densely populated to view a graph segment of the interest more clearly. VisJS lends an intutive feel by implement one of several physical simulations such as Barnes Hut :cite:`barneshut`. Others are mentioned in the VisJS documentation :cite:`visjs-physics`.
+The physics options dictates how a user can interact with the objects in the graph. The intent of the physic options is to make manipulating graph objects feel more intuitive when moving nodes around. As an example, the user can manipulate a portion of a graph that is densely populated to view a graph segment of the interest more clearly. VisJS implements several physical simulations such as Barnes Hut :cite:`barneshut`. Others are mentioned in the VisJS documentation :cite:`visjs-physics`.
 
-| We have the liberty of configuring the physics engine from within Pyvis:
+| We can configure the physics engine from within Pyvis:
 
 .. code-block:: python
 
@@ -190,11 +191,11 @@ The physics options dictates how a user can interact with the objects in the gra
    'solver': 'repulsion',
    'timestep': 0.34}}
 
-| The methods of a Network instance aim to construct an internal structure compatible with VisJS, demonstrated by the consistent pattern of JSON outputs seen above.
+| The methods of a ``Network`` instance construct an internal structure compatible with VisJS, demonstrated by the consistent pattern of JSON outputs seen above.
 
 NetworkX Support
 ----------------
-Although Pyvis supports its own methods for constructing a network data structure, you might feel more comfortable using the more established and dedicated NetworkX package. Pyvis takes this into account by offering a way to define your data as a NetworkX graph instance to then supply to a call to Pyvis.
+Although Pyvis supports its own methods for constructing a network data structure, you might feel more comfortable using the more established and dedicated NetworkX package. Pyvis allows you to define a NetworkX graph instance to then supply it to Pyvis.
 
 .. code-block:: python
 
@@ -269,17 +270,17 @@ Example
 
 .. image:: example3.png
 
-| At a glance, the resulting relationship network looks too intertwined to make any practical conclusions. However, the beauty of Pyvis is that each and every component of the network can be focused. Zooming in to a dense portion of the network we can hover over a particular node to get a glimpse of the scenario:
+| At a glance, the resulting relationship network looks too intertwined to make any practical conclusions. However, the beauty of Pyvis is that each and every component of the network can be focused. For example, zooming in to a dense portion of the network, we can hover over a particular node to get a glimpse of the scenario:
 
 .. image:: example4.png
 
 | This hover tooltip offers the context behind a particular node. We can see the immediate neighbors for each and every node since we provided a `title` attribute during the network construction. This simple example can be expanded upon to create more custom interactions tailored to specific needs of a dataset.
-| The network also makes use of weights. By providing a `value` attribute to each node we can see these values being represented by a node's size. In the code I used the amount of neighbors to dictate the node weight. This is a strong visual cue which makes it easy to see which nodes have the most connections.
-| The edge weights are assigned in a similar manner, although the dataset already provided the connection strength between nodes. These edge weights are differentiable in the final visualization, once again proving the usefulness of Pyvis' front-end features.
+| The network also uses weights. By providing a `value` attribute to each node we can see these values being represented by a node's size. In the code I used the amount of neighbors to dictate the node weight. This is a strong visual cue which makes it easy to see which nodes have the most connections.
+| The edge weights are assigned in a similar manner, although the dataset already provided the connection strength between nodes. These edge weights are distinguishable in the final visualization, once again proving the usefulness of Pyvis' front-end features.
 
 Under the Hood
 --------------
-VisJS simplifies their definition of a network to a declarative set of objects. Nodes, Edges, and an Options JSON object are given to the VisJS Network constructor. The following basic example from their documentation proves this:
+VisJS reduces the definition of a network to a declarative set of objects. Nodes, Edges, and an Options JSON object are given to the VisJS Network constructor. The following basic example from their documentation proves this:
 
 .. code-block:: JavaScript
 
@@ -319,9 +320,7 @@ VisJS simplifies their definition of a network to a declarative set of objects. 
 Conclusion
 ----------
 
-Pyvis is a powerful python module for visualizing and interactively manipulating network graphs in a standalone web application or a Jupyter notebook. Pyvis brings the power of VisJS into the python world. Pyvis makes accessible to the python programmer or data scientist on Jupyter the network visualization capabilities of VisJS. 
-
-With the methods described here using Pyvis, a user can easily develop highly interactive network visualizations.
+Pyvis is a powerful python module for visualizing and interactively manipulating network graphs in a standalone web application or a Jupyter notebook. Pyvis brings the power of VisJS to Python, thus enabling data scientists who use Jupyter to interactively visualize network graphs with all the fluid interactions of a pure-JavaScript application. 
 
 Code samples presented here, and with the corresponding poster presentation, as well as other supplemental material are available at West Health's github repository at
 `https://github.com/Westhealth/scipy2020/pyvis
