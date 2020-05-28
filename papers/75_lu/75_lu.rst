@@ -3,6 +3,9 @@
 :institution: Gary and Mary West Health Institute
 :bibliography: ourbib
 
+============================================================
+Quasi-orthonormal Encoding for Machine Learning Applications
+============================================================
 
 .. class:: abstract
 
@@ -11,10 +14,6 @@ Most machine learning models, especially artificial neural networks, require num
 .. class:: keywords
 
    machine learning, classification, categorical encoding
-
-============================================================
-Quasi-orthonormal Encoding for Machine Learning Applications
-============================================================
 
 Introduction
 ------------
@@ -672,7 +671,7 @@ Practically speaking, while algorithms to generate spherical codes and quasiorth
 
 In sum, QOE and spherical codes are useful tools to be included in a data scientists tool box along side other established categorical coding techniques.
 
-Experiments and code samples are made available at ``github.com/Westhealth/scipy2020/quasiorthogonal``.
+Experiments and code samples are made available at `https://github.com/Westhealth/scipy2020/quasiorthonormal <https://github.com/Westhealth/scipy2020/quasiorthonormal/>`_.
 
 References
 ----------
