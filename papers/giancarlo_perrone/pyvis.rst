@@ -113,66 +113,13 @@ Edges can be added all at once by supplying a list of tuples to a call to `add_e
 
 | Notice how an optional element is included in the 3-tuple above (2, 3, 5) representing the weight of the edge. This additional edge data allows for expressing weighted networks and is clearly noticeable in the visualization.
 
-Example
-^^^^^^^
-
-| To get a better understanding of the flow of a typical Pyvis network visualization, we can take a look at the following code snippet to show off a typical application of the features. I have taken a Game of Thrones dataset defining the relationships between characters and the frequencies between them to create a network to naturally express this.
-
-.. code-block:: python
-
-   from pyvis.network import Network
-   import pandas as pd
-
-   got_net = Network(
-      height="750px",
-      width="100%",
-      bgcolor="#222222",
-      font_color="white"
-   )
-
-   # set the physics layout of the network
-   got_net.barnes_hut()
-   got_data = pd.read_csv("stormofswords.csv")
-
-   sources = got_data['Source']
-   targets = got_data['Target']
-   weights = got_data['Weight']
-
-   edge_data = zip(sources, targets, weights)
-
-   for e in edge_data:
-      src = e[0]
-      dst = e[1]
-      w = e[2]
-
-      got_net.add_node(src, src, title=src)
-      got_net.add_node(dst, dst, title=dst)
-      got_net.add_edge(src, dst, value=w)
-
-   neighbor_map = got_net.get_adj_list()
-
-   # add neighbor data to node hover data
-   for node in got_net.nodes:
-      node["title"] += " Neighbors:<br>" + \
-                        "<br>".join(neighbor_map[node["id"]])
-      node["value"] = len(neighbor_map[node["id"]])
-
-   got_net.show("gameofthrones.html")
-
-.. image:: example3.png
-
-| At a glance, the resulting relationship network looks too intertwined to make any practical conclusions. However, the beauty of Pyvis is that each and every component of the network can be focused. Zooming in to a dense portion of the network we can hover over a particular node to get a glimpse of the scenario:
-
-.. image:: example4.png
-
-| This hover tooltip offers the context behind a particular node. We can see the immediate neighbors for each and every node since we provided a `title` attribute during the network construction. This simple example can be expanded upon to create more custom interactions tailored to specific needs of a dataset.
-| The network also makes use of weights. By providing a `value` attribute to each node we can see these values being represented by a node's size. In the code I used the amount of neighbors to dictate the node weight. This is a strong visual cue which makes it easy to see which nodes have the most connections.
-| The edge weights are assigned in a similar manner, although the dataset already provided the connection strength between nodes. These edge weights are differentiable in the final visualization, once again proving the usefulness of Pyvis' front-end features.
-
 Layout
 ------
 | In situations where your network involves complex connections, Pyvis allows you to manually explore these relationships with intuitive mouse interactions. Nodes can be dragged into more visible positions if the layout is obstructing the view. 
 | All of this is made possible by the front end engine provided by VisJS. Their extensive documentation defines several options for supplying layout and physics configurations to instances of a network. These physics options are built-in to VisJS, so tweaking the physics of the rendered simulation is as simple as providing the parameters to the specific solver. 
+
+The physics options dictates how a user can interact with the objects in the graph. The intent of the physic options is to make manipulating graph objects feel more intuitive when moving nodes around. As an example, the user can manipulate a portion of a graph that is densely populated to view a graph segment of the interest more clearly. VisJS lends an intutive feel by implement one of several physical simulations such as Barnes Hut :cite:`barneshut`. Others are mentioned in the VisJS documentation :cite:`visjs-physics`.
+
 | We have the liberty of configuring the physics engine from within Pyvis:
 
 .. code-block:: python
@@ -265,15 +212,69 @@ Although Pyvis supports its own methods for constructing a network data structur
 
 Jupyter Support
 ---------------
-For efficient prototyping of visualized graphs, Pyvis aims to utilize Jupyter's front-end IFrame features to embed the graph in a notebook output cell. Simply passing in a notebook argument during instantiation lets Pyvis know that the call to `show()` should write the HTML and serve as an IFrame.  
-
+For efficient prototyping of visualized graphs, Pyvis aims to utilize Jupyter's front-end IFrame features to embed the graph in a notebook output cell.
+With that in mind, embedding a Pyvis visualization into a Jupyter notebook is essentially the same as described above. The only difference is that one should pass in a notebook argument during instantiation. The result of the visualizaiton is shown in the output cell below the ``show()`` invocation. Pyvis upon the call to ``show()`` writes the HTML that serves an IFrame, which displays the result in the output cell.
 |
 
 .. image:: example7.png
 
 | One thing to keep in mind is that an HTML file is always generated due to the dependence on the VisJS JavaScript bindings.
 
-[Maybe a little more explanation in this section]
+Example
+-------
+
+| To get a better understanding of the flow of a typical Pyvis network visualization, we can take a look at the following code snippet to show off a typical application of the features. I have taken a Game of Thrones dataset (:cite:`gthrones` Storm of Swords Dataset) defining the relationships between characters and the frequencies between them to create a network to naturally express this. Specifically, it is a csv file containing pairs of characters and a weight between them.
+
+.. code-block:: python
+
+   from pyvis.network import Network
+   import pandas as pd
+
+   got_net = Network(
+      height="750px",
+      width="100%",
+      bgcolor="#222222",
+      font_color="white"
+   )
+
+   # set the physics layout of the network
+   got_net.barnes_hut()
+   got_data = pd.read_csv("stormofswords.csv")
+
+   sources = got_data['Source']
+   targets = got_data['Target']
+   weights = got_data['Weight']
+
+   edge_data = zip(sources, targets, weights)
+
+   for e in edge_data:
+      src = e[0]
+      dst = e[1]
+      w = e[2]
+
+      got_net.add_node(src, src, title=src)
+      got_net.add_node(dst, dst, title=dst)
+      got_net.add_edge(src, dst, value=w)
+
+   neighbor_map = got_net.get_adj_list()
+
+   # add neighbor data to node hover data
+   for node in got_net.nodes:
+      node["title"] += " Neighbors:<br>" + \
+                        "<br>".join(neighbor_map[node["id"]])
+      node["value"] = len(neighbor_map[node["id"]])
+
+   got_net.show("gameofthrones.html")
+
+.. image:: example3.png
+
+| At a glance, the resulting relationship network looks too intertwined to make any practical conclusions. However, the beauty of Pyvis is that each and every component of the network can be focused. Zooming in to a dense portion of the network we can hover over a particular node to get a glimpse of the scenario:
+
+.. image:: example4.png
+
+| This hover tooltip offers the context behind a particular node. We can see the immediate neighbors for each and every node since we provided a `title` attribute during the network construction. This simple example can be expanded upon to create more custom interactions tailored to specific needs of a dataset.
+| The network also makes use of weights. By providing a `value` attribute to each node we can see these values being represented by a node's size. In the code I used the amount of neighbors to dictate the node weight. This is a strong visual cue which makes it easy to see which nodes have the most connections.
+| The edge weights are assigned in a similar manner, although the dataset already provided the connection strength between nodes. These edge weights are differentiable in the final visualization, once again proving the usefulness of Pyvis' front-end features.
 
 Under the Hood
 --------------
