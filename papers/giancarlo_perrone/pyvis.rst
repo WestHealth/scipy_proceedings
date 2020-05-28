@@ -25,7 +25,14 @@ The structure of a Pyvis network data structure aligns with the patterns expecte
 
 Prior to being made open source, Pyvis has been used extensively in internal data discovery projects to quickly explore and recognize patterns. We began development to serve as the front end component for an internal Data Reduction Network project. While we maintained an efficient data structure to represent the trends of hundreds of survey responses, our need for the visual capture of additional metadata lacked a solution. Initial approaches lacked an interactive factor, limiting our analysis in scope. Pyvis made it easy to abstract our existing data structure to just nodes and edges with our desired attributes. The visualization was then handed off to the VisJS layer to interpret the resulting data structure to give us a nice and fluid visual where we could really see the level of detail in each node and edge in our network. In this paper, we describe Pyvis under the hood and demonstrate key examples of how to create the data structures which result in the desired visualizations.
 
-[In the next section, we discuss... Then we talk about layout...
+In the following section, we demonstrate how to get up and running with Pyvis in a smaller scope by showing off the common methods of creating a network. This will also include some exposure to the customizability options that makes Pyvis so useful. 
+
+In the Layout section, we will see exactly how nodes and edges can be spatially specified by interacting with various physics parameters interpreted by the front end engine. 
+
+Integrations with Jupyter and NetworkX will be presented to establish Pyvis compatibility with popular data science workflows.
+
+Finally, a thought out example will include the interpretation of a practical Game of Thrones relationship dataset to demonstrate a Pyvis use case from the ground up. This minimal example will be a base case for the features that Pyvis supports.
+
 
 Pyvis Usage
 -----------
