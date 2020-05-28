@@ -99,7 +99,8 @@ Keyword arguments can be used to add properties to the nodes in Network:
 .. code-block:: python
 
    g.add_edge(1, 2)
-   g.add_edge(2, 3, weight=5) # will adjust edge thickness
+   # will adjust edge thickness
+   g.add_edge(2, 3, weight=5)
 
 Edges can be added all at once by supplying a list of tuples to a call to `add_edges()`. The following is an equivalent result:
 
@@ -261,7 +262,7 @@ Example
    # add neighbor data to node hover data
    for node in got_net.nodes:
       node["title"] += " Neighbors:<br>" + \
-                        "<br>".join(neighbor_map[node["id"]])
+              "<br>".join(neighbor_map[node["id"]])
       node["value"] = len(neighbor_map[node["id"]])
 
    got_net.show("gameofthrones.html")
@@ -318,7 +319,9 @@ VisJS simplifies their definition of a network to a declarative set of objects. 
 Conclusion
 ----------
 
-[Sum up why you might want to use this. How it can benefit the end user etc.]
+Pyvis is a powerful python module for visualizing and interactively manipulating network graphs in a standalone web application or a Jupyter notebook. Pyvis brings the power of VisJS into the python world. Pyvis makes accessible to the python programmer or data scientist on Jupyter the network visualization capabilities of VisJS. 
+
+With the methods described here using Pyvis, a user can easily develop highly interactive network visualizations.
 
 Code samples presented here, and with the corresponding poster presentation, as well as other supplemental material are available at West Health's github repository at
 `https://github.com/Westhealth/scipy2020/pyvis
