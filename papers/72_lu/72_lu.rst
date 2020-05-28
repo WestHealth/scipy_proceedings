@@ -31,6 +31,10 @@ and JupyterLab, it also supports R-Studio and bespoke applications that share
 the same authentication mechanisms. Further, the platform can be extended to
 other cloud services other than AWS.
 
+.. class:: keywords
+
+   data science, infrastructure, jupyter, rstudio
+
 Introduction
 ------------
 
