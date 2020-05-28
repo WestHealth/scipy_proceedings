@@ -214,7 +214,7 @@ Although Pyvis supports its own methods for constructing a network data structur
 Jupyter Support
 ---------------
 For efficient prototyping of visualized graphs, Pyvis aims to utilize Jupyter's front-end IFrame features to embed the graph in a notebook output cell.
-With that in mind, embedding a Pyvis visualization into a Jupyter notebook is essentially the same as described above. The only difference is that one should pass in a notebook argument during instantiation. The result of the visualizaiton is shown in the output cell below the ``show()`` invocation. Pyvis upon the call to ``show()`` writes the HTML that serves an IFrame, which displays the result in the output cell.
+With that in mind, embedding a Pyvis visualization into a Jupyter notebook is essentially the same as described above. The only difference is that one should pass in a notebook argument during instantiation. The result of the visualization is shown in the output cell below the ``show()`` invocation. Pyvis upon the call to ``show()`` writes the HTML that serves an IFrame, which displays the result in the output cell.
 |
 
 .. image:: example7.png
