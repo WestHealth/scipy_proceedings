@@ -25,7 +25,14 @@ The Pyvis network data structure matches the JavaScript VisJS object. This makes
 
 Before open-sourcing Pyvis, we used it successfully to understand relationships among hundreds of variables in a complex survey. Although we maintained an efficient data structure to represent the trends in the survey responses, we still needed a way to visualize and interact with additional metadata. Pyvis made it easy to abstract our existing data structure into nodes and edges with our desired metadata and then render the visualization with VisJS to easily identify the interrelationships. In this paper, we describe the design of Pyvis with examples showing the data structures which are rendered by VisJS.
 
-[In the next section, we discuss... Then we talk about layout...
+In the following section, we demonstrate how to get up and running with Pyvis in a smaller scope by showing off the common methods of creating a network. This will also include some exposure to the customizability options that makes Pyvis so useful. 
+
+In the Layout section, we will see exactly how nodes and edges can be spatially specified by interacting with various physics parameters interpreted by the front end engine. 
+
+Integrations with Jupyter and NetworkX will be presented to establish Pyvis compatibility with popular data science workflows.
+
+Finally, a thought out example will include the interpretation of a practical Game of Thrones relationship dataset to demonstrate a Pyvis use case from the ground up. This minimal example will be a base case for the features that Pyvis supports.
+
 
 Pyvis Usage
 -----------
