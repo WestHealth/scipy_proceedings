@@ -1,6 +1,15 @@
 :author: Giancarlo Perrone
 :email: gperrone@westhealth.org
-:institution: West Health Institute
+:institution: Gary and Mary West Health Institute
+
+:author: Jose Unpingco
+:email: jhunpingco@westhealth.org
+:institution: Gary and Mary West Health Institute
+
+:author: Haw-minn Lu
+:email: hlu@westhealth.org
+:institution: Gary and Mary West Health Institute
+
 :bibliography: ourbib
 
 -------------------------------------------
