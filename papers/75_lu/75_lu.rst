@@ -1,4 +1,3 @@
-
 :author: Haw-minn Lu
 :email: hlu@westhealth.org
 :institution: Gary and Mary West Health Institute
@@ -51,7 +50,7 @@ is that it does not induce artificial geometric relationships that can
 cause downstream bias in the results because each label in a category
 remains mathematically near orthogonal to the other labels.
 
-.. [#] :cite:`curse` On the one hand, a footnote.
+.. [#] Mukhtar :cite:`mukhtar` gives a good explanation of the curse of dimensionality as applied to data science.
 
 We will briefly survey *classic* encoding methods, discuss the
 theoretical aspects of QOE, and present a detailed example implementation
